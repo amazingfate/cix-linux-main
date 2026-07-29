@@ -1,0 +1,69 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Jason Perlow <jperlow@gmail.com>
+Date: Wed, 29 Jul 2026 20:58:48 +0000
+Subject: drm/panthor: defer probe while the Sky1 gpu core clock is
+ not ready
+
+On Sky1 ACPI boot there is no ordering guarantee between panthor and
+the SCMI clock provider that registers the gpu_clk_core clkdev alias.
+If panthor probes first, the clock lookup fails with -ENOENT and the
+probe fails for good; if the alias exists but the clock is not yet
+functional, clk_get_rate() reports 0, the GPU is unclocked, and the
+first register access raises an asynchronous SError that panics the
+whole boot (captured via ramoops on a Sky1 board).
+
+Turn both cases into -EPROBE_DEFER so panthor retries once the SCMI
+clock provider has come up. Non-Sky1 platforms are unaffected.
+---
+ drivers/gpu/drm/panthor/panthor_device.c | 27 +++++++++++++++++++++---
+ 1 file changed, 24 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/panthor/panthor_device.c b/drivers/gpu/drm/panthor/panthor_device.c
+index 1094a00f5..6f2724ca9 100644
+--- a/drivers/gpu/drm/panthor/panthor_device.c
++++ b/drivers/gpu/drm/panthor/panthor_device.c
+@@ -68,10 +68,20 @@ static int panthor_clk_init(struct panthor_device *ptdev)
+ 	if (panthor_is_sky1(ptdev)) {
+ 		/* Sky1 (ACPI) exposes clocks under vendor names. */
+ 		ptdev->clks.core = devm_clk_get(ptdev->base.dev, "gpu_clk_core");
+-		if (IS_ERR(ptdev->clks.core))
+-			return dev_err_probe(ptdev->base.dev,
+-					     PTR_ERR(ptdev->clks.core),
++		if (IS_ERR(ptdev->clks.core)) {
++			long err = PTR_ERR(ptdev->clks.core);
++
++			/*
++			 * The SCMI clock provider registers the gpu_clk_core
++			 * clkdev alias from its own probe; if panthor probes
++			 * first, the lookup fails with -ENOENT. Defer instead
++			 * of failing for good.
++			 */
++			if (err == -ENOENT)
++				err = -EPROBE_DEFER;
++			return dev_err_probe(ptdev->base.dev, err,
+ 					     "get 'gpu_clk_core' clock failed");
++		}
+ 
+ 		ptdev->clks.stacks = devm_clk_get_optional(ptdev->base.dev,
+ 							   "gpu_clk_stacks");
+@@ -101,6 +111,17 @@ static int panthor_clk_init(struct panthor_device *ptdev)
+ 				     "get 'coregroup' clock failed");
+ 
+ 	drm_info(&ptdev->base, "clock rate = %lu\n", clk_get_rate(ptdev->clks.core));
++
++	/*
++	 * Sky1 (ACPI): if the SCMI gpu_core clock is registered but not yet
++	 * functional, it reports a rate of 0 and the GPU is unclocked --
++	 * touching its registers raises an asynchronous SError that panics
++	 * the whole boot. Defer until the clock reports a real rate.
++	 */
++	if (panthor_is_sky1(ptdev) && !clk_get_rate(ptdev->clks.core))
++		return dev_err_probe(ptdev->base.dev, -EPROBE_DEFER,
++				     "Sky1: gpu core clock not ready, deferring probe");
++
+ 	return 0;
+ }
+ 
+-- 
+2.53.0
+
