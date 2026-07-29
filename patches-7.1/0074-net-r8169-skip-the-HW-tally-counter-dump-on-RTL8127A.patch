@@ -1,0 +1,53 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Jason Perlow <jperlow@gmail.com>
+Date: Wed, 29 Jul 2026 20:59:09 +0000
+Subject: net: r8169: skip the HW tally counter dump on RTL8127A
+
+On CIX Sky1 boards with the on-board RTL8127A (MAC_VER_80), any MMIO
+access to the NIC BAR from the stats path faults once the device has
+powered down its BAR, and escalates to a fatal ARM SError (first
+observed via systemd-resolved's RTNL poll ~10 s after boot: the
+CounterDump DMA faults, then the ChipCmd read itself, ESR 0xbe000011).
+The same access pattern panics the shutdown path when the tally dump
+runs from rtl_shutdown. The NIC reports pm_runtime "active" while its
+BAR is actually inaccessible.
+
+Bail out of rtl8169_update_counters() before touching any register on
+RTL8127A; get_stats64 falls back to the software counters.
+
+Validated on Radxa Orion O6 metal: no more SError on the RTNL stats
+poll and clean reboots with the RTL8127A NIC.
+---
+ drivers/net/ethernet/realtek/r8169_main.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/realtek/r8169_main.c b/drivers/net/ethernet/realtek/r8169_main.c
+index 791277e75..d8b646b02 100644
+--- a/drivers/net/ethernet/realtek/r8169_main.c
++++ b/drivers/net/ethernet/realtek/r8169_main.c
+@@ -1932,7 +1932,21 @@ static void rtl8169_do_counters(struct rtl8169_private *tp, u32 counter_cmd)
+ 
+ static void rtl8169_update_counters(struct rtl8169_private *tp)
+ {
+-	u8 val = RTL_R8(tp, ChipCmd);
++	u8 val;
++
++	/*
++	 * CIX Sky1: on the RTL8127A (MAC_VER_80) any MMIO to the NIC BAR from
++	 * the stats path faults once the device has powered down its BAR, and
++	 * escalates to a fatal ARM SError (seen via systemd-resolved's RTNL
++	 * poll ~10 s after boot: first the CounterDump DMA, then the ChipCmd
++	 * read itself, ESR 0xbe000011). The NIC reports pm_runtime "active"
++	 * while its BAR is actually inaccessible. Bail out before touching
++	 * any register -- @get_stats64 returns the software counters.
++	 */
++	if (tp->mac_version >= RTL_GIGA_MAC_VER_80)
++		return;
++
++	val = RTL_R8(tp, ChipCmd);
+ 
+ 	/*
+ 	 * Some chips are unable to dump tally counters when the receiver
+-- 
+2.53.0
+

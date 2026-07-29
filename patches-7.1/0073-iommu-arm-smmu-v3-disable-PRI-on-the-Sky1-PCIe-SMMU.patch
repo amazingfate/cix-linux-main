@@ -1,0 +1,47 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Jason Perlow <jperlow@gmail.com>
+Date: Wed, 29 Jul 2026 20:59:08 +0000
+Subject: iommu/arm-smmu-v3: disable PRI on the Sky1 PCIe SMMU
+
+Sky1's IORT reports ATS, but not PRI, for the PCIe root complex.
+Enabling the MMU-700 PRI queue on this integration produces sustained
+C_BAD_STREAMID events (~130 IRQ/s on CPU0) followed by PCIe transaction
+failures; the working vendor 7.0 configuration never enables
+CR0.PRIQEN.
+
+Mask ARM_SMMU_FEAT_PRI for the Sky1 PCIe SMMU before the in-memory
+structures are initialised, so a generic configuration with
+CONFIG_PCI_PRI=y ends up in the same hardware state: no PRI queue
+allocated and PRIQEN never set.
+---
+ drivers/iommu/arm/arm-smmu-v3/arm-smmu-v3.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/drivers/iommu/arm/arm-smmu-v3/arm-smmu-v3.c b/drivers/iommu/arm/arm-smmu-v3/arm-smmu-v3.c
+index a33b434d6..25bda609a 100644
+--- a/drivers/iommu/arm/arm-smmu-v3/arm-smmu-v3.c
++++ b/drivers/iommu/arm/arm-smmu-v3/arm-smmu-v3.c
+@@ -5639,6 +5639,20 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	/*
++	 * Sky1's IORT reports ATS, but not PRI, for the PCIe root complex.
++	 * Enabling the MMU-700 PRI queue on this integration produces
++	 * sustained C_BAD_STREAMID events followed by PCIe transaction
++	 * failures. Mask PRI before queue allocation so a generic
++	 * configuration with CONFIG_PCI_PRI=y ends up in the same hardware
++	 * state (no PRI queue, PRIQEN never set).
++	 */
++	if (arm_smmu_is_cix_sky1_pcie(smmu) &&
++	    (smmu->features & ARM_SMMU_FEAT_PRI)) {
++		smmu->features &= ~ARM_SMMU_FEAT_PRI;
++		dev_info(dev, "CIX Sky1 PCIe SMMU: PRI disabled\n");
++	}
++
+ 	/* Initialise in-memory data structures */
+ 	ret = arm_smmu_init_structures(smmu);
+ 	if (ret)
+-- 
+2.53.0
+
