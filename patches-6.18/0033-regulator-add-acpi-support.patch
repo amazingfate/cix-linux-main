@@ -36,10 +36,10 @@ index 111111111111..222222222222 100644
  #include <linux/regulator/machine.h>
  #include <linux/module.h>
 +#include <linux/acpi.h>
+ #include <linux/workqueue.h>
  
  #define CREATE_TRACE_POINTS
- #include <trace/events/regulator.h>
-@@ -421,6 +422,52 @@ static void regulator_lock_dependent(struct regulator_dev *rdev,
+@@ -422,6 +423,52 @@ static void regulator_lock_dependent(struct regulator_dev *rdev,
  	mutex_unlock(&regulator_list_mutex);
  }
  
@@ -92,7 +92,7 @@ index 111111111111..222222222222 100644
  /* Platform voltage constraint check */
  int regulator_check_voltage(struct regulator_dev *rdev,
  			    int *min_uV, int *max_uV)
-@@ -2004,13 +2051,30 @@ static struct regulator_dev *regulator_dev_lookup(struct device *dev,
+@@ -2022,13 +2069,30 @@ static struct regulator_dev *regulator_dev_lookup(struct device *dev,
  	struct regulator_dev *r = NULL;
  	struct regulator_map *map;
  	const char *devname = NULL;
@@ -123,7 +123,7 @@ index 111111111111..222222222222 100644
  
  	/* if not found, try doing it non-dt way */
  	if (dev)
-@@ -5632,8 +5696,10 @@ static void regulator_resolve_coupling(struct regulator_dev *rdev)
+@@ -5650,8 +5714,10 @@ static void regulator_resolve_coupling(struct regulator_dev *rdev)
  		/* already resolved */
  		if (c_desc->coupled_rdevs[i])
  			continue;
@@ -136,7 +136,7 @@ index 111111111111..222222222222 100644
  
  		if (!c_rdev)
  			continue;
-@@ -5706,8 +5772,8 @@ static int regulator_init_coupling(struct regulator_dev *rdev)
+@@ -5724,8 +5790,8 @@ static int regulator_init_coupling(struct regulator_dev *rdev)
  	struct regulator_dev **coupled;
  	int err, n_phandles;
  
@@ -147,7 +147,7 @@ index 111111111111..222222222222 100644
  	else
  		n_phandles = of_get_n_coupled(rdev);
  
-@@ -5729,8 +5795,13 @@ static int regulator_init_coupling(struct regulator_dev *rdev)
+@@ -5747,8 +5813,13 @@ static int regulator_init_coupling(struct regulator_dev *rdev)
  	if (n_phandles == 0)
  		return 0;
  
@@ -163,7 +163,7 @@ index 111111111111..222222222222 100644
  
  	mutex_lock(&regulator_list_mutex);
  	rdev->coupling_desc.coupler = regulator_find_coupler(rdev);
-@@ -5856,8 +5927,12 @@ regulator_register(struct device *dev,
+@@ -5874,8 +5945,12 @@ regulator_register(struct device *dev,
  	 * DT may override the config->init_data provided if the platform
  	 * needs to do so. If so, config->init_data is completely ignored.
  	 */
@@ -178,7 +178,7 @@ index 111111111111..222222222222 100644
  
  	/*
  	 * Sometimes not all resources are probed already so we need to take
-@@ -5882,6 +5957,7 @@ regulator_register(struct device *dev,
+@@ -5900,6 +5975,7 @@ regulator_register(struct device *dev,
  	if (!init_data) {
  		init_data = config->init_data;
  		rdev->dev.of_node = of_node_get(config->of_node);
