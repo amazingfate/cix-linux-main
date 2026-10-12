@@ -11,7 +11,7 @@ diff --git a/drivers/clk/cix/clk-sky1-audss.c b/drivers/clk/cix/clk-sky1-audss.c
 index 111111111111..222222222222 100644
 --- a/drivers/clk/cix/clk-sky1-audss.c
 +++ b/drivers/clk/cix/clk-sky1-audss.c
-@@ -1,15 +1,20 @@
+@@ -1,14 +1,19 @@
  // SPDX-License-Identifier: GPL-2.0-only
  // Copyright 2026 Cix Technology Group Co., Ltd.
  
@@ -25,14 +25,13 @@ index 111111111111..222222222222 100644
 +#include <linux/fwnode.h>
  #include <linux/module.h>
  #include <linux/of.h>
- #include <linux/of_device.h>
  #include <linux/platform_device.h>
  #include <linux/pm_runtime.h>
 +#include <linux/property.h>
  #include <linux/regmap.h>
  #include <linux/reset.h>
  
-@@ -43,6 +48,18 @@ static const u32 sky1_clk_rate_default[SKY1_AUDSS_CLK_PARENTS_CNT] = {
+@@ -42,6 +47,18 @@ static const u32 sky1_clk_rate_default[SKY1_AUDSS_CLK_PARENTS_CNT] = {
  	48000000,
  };
  
@@ -51,7 +50,7 @@ index 111111111111..222222222222 100644
  static const char * const dsp_clk_parent[] = {
  	"audio_clk4"
  };
-@@ -557,6 +574,152 @@ static int sky1_audss_reset_controller_register(struct device *dev)
+@@ -556,6 +573,152 @@ static int sky1_audss_reset_controller_register(struct device *dev)
  
  #endif
  
@@ -204,7 +203,7 @@ index 111111111111..222222222222 100644
  /*
   * clk_ops for audss clock mux/divider/gate
   */
-@@ -975,14 +1138,22 @@ static int sky1_audss_clk_probe(struct platform_device *pdev)
+@@ -988,14 +1151,22 @@ static int sky1_audss_clk_probe(struct platform_device *pdev)
  	priv->clk_data->num = SKY1_AUDSS_NUM_CLKS;
  	clk_table = priv->clk_data->hws;
  
@@ -235,7 +234,7 @@ index 111111111111..222222222222 100644
  
  	priv->dev = dev;
  	priv->devtype_data = devtype_data;
-@@ -1000,6 +1171,18 @@ static int sky1_audss_clk_probe(struct platform_device *pdev)
+@@ -1028,6 +1199,18 @@ static int sky1_audss_clk_probe(struct platform_device *pdev)
  	pm_runtime_set_active(dev);
  	pm_runtime_enable(dev);
  
@@ -251,10 +250,10 @@ index 111111111111..222222222222 100644
 +			dev_warn(dev, "ACPI D0 transition failed: %d\n", ret);
 +	}
 +
- 	platform_set_drvdata(pdev, priv);
- 
- 	ret = sky1_audss_clks_get(priv);
-@@ -1077,7 +1260,11 @@ static int sky1_audss_clk_probe(struct platform_device *pdev)
+ 	/*
+ 	 * Register cleanup action before clocks/provider (released last under LIFO).
+ 	 */
+@@ -1098,7 +1281,11 @@ static int sky1_audss_clk_probe(struct platform_device *pdev)
  		}
  	}
  
@@ -266,10 +265,10 @@ index 111111111111..222222222222 100644
 +						  priv->clk_data);
  	if (ret) {
  		dev_err(dev, "failed to add clock provider: %d\n", ret);
- 		goto fail_register;
-@@ -1087,6 +1274,10 @@ static int sky1_audss_clk_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto fail_register;
+ 		goto fail_pm;
+@@ -1110,6 +1297,10 @@ static int sky1_audss_clk_probe(struct platform_device *pdev)
+ 		goto fail_pm;
+ 	}
  
 +	/* Allow DLKL consumers (DMA, I2S, HDA, etc.) to enumerate now. */
 +	if (has_acpi_companion(dev))
@@ -278,7 +277,7 @@ index 111111111111..222222222222 100644
  	pm_runtime_put_sync(dev);
  
  	return 0;
-@@ -1180,12 +1371,29 @@ static const struct sky1_audss_clks_devtype_data sky1_devtype_data = {
+@@ -1184,18 +1375,36 @@ static const struct sky1_audss_clks_devtype_data sky1_devtype_data = {
  	.clk_cfg_size = ARRAY_SIZE(sky1_audss_clks),
  };
  
@@ -307,13 +306,12 @@ index 111111111111..222222222222 100644
 +
  static struct platform_driver sky1_audss_clk_driver = {
  	.probe = sky1_audss_clk_probe,
- 	.remove = sky1_audss_clk_remove,
-@@ -1193,6 +1401,7 @@ static struct platform_driver sky1_audss_clk_driver = {
+ 	.driver = {
  		.name = "sky1-audss-clk",
  		.suppress_bind_attrs = true,
  		.of_match_table = sky1_audss_clk_of_match,
 +		.acpi_match_table = ACPI_PTR(sky1_audss_clk_acpi_match),
- 		.pm = &sky1_audss_clk_pm_ops,
+ 		.pm = pm_ptr(&sky1_audss_clk_pm_ops),
  	},
  };
 -- 
