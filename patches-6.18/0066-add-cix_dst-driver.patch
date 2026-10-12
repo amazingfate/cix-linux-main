@@ -75,7 +75,7 @@ Subject: add cix_dst driver
  drivers/soc/cix/cix_dst/dst_sdei_tee_exceptions.c                           |  156 ++
  drivers/soc/cix/cix_dst/dst_sdei_tfa_trace.c                                |  109 +
  drivers/soc/cix/cix_dst/dst_sdei_tzc400.c                                   |  213 ++
- drivers/soc/cix/cix_dst/dst_wakeup_source.c                                 |   68 +
+ drivers/soc/cix/cix_dst/dst_wakeup_source.c                                 |   87 +
  drivers/soc/cix/cix_dst/hw_boottime.c                                       |  212 ++
  drivers/soc/cix/cix_dst/hw_breakpoint/Kconfig                               |   10 +
  drivers/soc/cix/cix_dst/hw_breakpoint/Makefile                              |    6 +
@@ -128,7 +128,7 @@ Subject: add cix_dst driver
  include/linux/soc/cix/rdr_types.h                                           |   22 +
  include/linux/soc/cix/util.h                                                |  111 +
  include/uapi/linux/perf_event.h                                             |   61 +
- 124 files changed, 21908 insertions(+), 16 deletions(-)
+ 124 files changed, 21927 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/soc/cix/Kconfig b/drivers/soc/cix/Kconfig
 index 111111111111..222222222222 100644
@@ -14560,7 +14560,8 @@ new file mode 100644
 index 000000000000..111111111111
 --- /dev/null
 +++ b/drivers/soc/cix/cix_dst/dst_wakeup_source.c
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,87 @@
++#include <linux/version.h>
 +// SPDX-License-Identifier: GPL-2.0
 +/* Copyright 2025 Cix Technology Group Co., Ltd.*/
 +#include <linux/soc/cix/cix_ap2se_ipc.h>
@@ -14605,6 +14606,19 @@ index 000000000000..111111111111
 +			g_wakeup_src_dat.wakeup_sub_src[3]);
 +	}
 +}
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 52)
++static void wakeup_src_resume(void *data)
++{
++	schedule_delayed_work(&g_delay_wq, msecs_to_jiffies(WAKEUP_WORK_DELAY_MS));
++}
++static const struct syscore_ops wakeup_src_syscore_ops = {
++	.suspend = NULL,
++	.resume = wakeup_src_resume,
++};
++static struct syscore wakeup_src_syscore = {
++	.ops = &wakeup_src_syscore_ops,
++};
++#else
 +static void wakeup_src_resume(void)
 +{
 +	schedule_delayed_work(&g_delay_wq, msecs_to_jiffies(WAKEUP_WORK_DELAY_MS));
@@ -14613,6 +14627,7 @@ index 000000000000..111111111111
 +	.suspend = NULL,
 +	.resume = wakeup_src_resume,
 +};
++#endif
 +static int wakeup_src_init(void)
 +{
 +	int ret;
@@ -14621,7 +14636,11 @@ index 000000000000..111111111111
 +	if (ret) {
 +		pr_err("register wakeup src rx callback failed\n");
 +	}
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 52)
++	register_syscore(&wakeup_src_syscore);
++#else
 +	register_syscore_ops(&wakeup_src_syscore_ops);
++#endif
 +	INIT_DELAYED_WORK(&g_delay_wq, wakeup_src_work);
 +	return ret;
 +}
