@@ -16,7 +16,7 @@ index 111111111111..222222222222 100644
 +++ b/drivers/clk/cix/Kconfig
 @@ -2,6 +2,16 @@
  # Audio subsystem clock support for Cixtech SoC family
- menu "Clock support for Cixtech audss"
+ menu "Cixtech Audio Subsystem Clock Driver"
  
 +config CLK_SKY1_ACPI
 +	tristate "CIX Sky1 ACPI clock lookup table support"

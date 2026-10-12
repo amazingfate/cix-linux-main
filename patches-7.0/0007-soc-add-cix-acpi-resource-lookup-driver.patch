@@ -9,8 +9,8 @@ Signed-off-by: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
  drivers/soc/Makefile                       |   1 +
  drivers/soc/cix/Kconfig                    |  17 +
  drivers/soc/cix/Makefile                   |   2 +
- drivers/soc/cix/cix-acpi-resource-lookup.c | 394 ++++++++++
- 5 files changed, 415 insertions(+)
+ drivers/soc/cix/cix-acpi-resource-lookup.c | 646 ++++++++++
+ 5 files changed, 667 insertions(+)
 
 diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
 index 111111111111..222222222222 100644
@@ -72,7 +72,7 @@ new file mode 100644
 index 000000000000..111111111111
 --- /dev/null
 +++ b/drivers/soc/cix/cix-acpi-resource-lookup.c
-@@ -0,0 +1,394 @@
+@@ -0,0 +1,646 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * CIX ACPI Resource Lookup driver
@@ -81,7 +81,7 @@ index 000000000000..111111111111
 + * devices to bridge the gap between CIX's ACPI firmware and the Linux
 + * kernel's standard resource lookup mechanisms.
 + *
-+ * RSTL (Reset Lookup):   Registers reset_control_lookup entries so that
++ * RSTL (Reset Lookup):   Injects _DSD reset-names/resets properties so that
 + *                        devm_reset_control_get() works under ACPI.
 + * RSNL (Resource Names): Assigns names to platform_device resources by
 + *                        index so platform_get_resource_byname() works.
@@ -99,28 +99,32 @@ index 000000000000..111111111111
 +#include <linux/kernel.h>
 +#include <linux/module.h>
 +#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
++#include <linux/slab.h>
++#include <linux/uuid.h>
 +
-+static struct device *acpi_obj_to_platform_device(const union acpi_object *obj)
++static struct acpi_device *acpi_obj_to_adev(const union acpi_object *obj)
 +{
-+	struct acpi_device *adev;
++	acpi_handle handle;
 +
 +	if (!obj)
 +		return NULL;
 +
 +	if (obj->type == ACPI_TYPE_LOCAL_REFERENCE) {
-+		adev = acpi_fetch_acpi_dev(obj->reference.handle);
++		handle = obj->reference.handle;
 +	} else if (obj->type == ACPI_TYPE_STRING) {
-+		acpi_handle handle;
-+		acpi_status status;
-+
-+		status = acpi_get_handle(NULL, obj->string.pointer, &handle);
-+		if (ACPI_FAILURE(status))
++		if (ACPI_FAILURE(acpi_get_handle(NULL, obj->string.pointer,
++						 &handle)))
 +			return NULL;
-+		adev = acpi_fetch_acpi_dev(handle);
 +	} else {
 +		return NULL;
 +	}
++
++	return acpi_fetch_acpi_dev(handle);
++}
++
++static struct device *acpi_obj_to_platform_device(const union acpi_object *obj)
++{
++	struct acpi_device *adev = acpi_obj_to_adev(obj);
 +
 +	if (!adev)
 +		return NULL;
@@ -128,30 +132,74 @@ index 000000000000..111111111111
 +	return bus_find_device_by_acpi_dev(&platform_bus_type, adev);
 +}
 +
-+static const char *acpi_obj_to_devname(const union acpi_object *obj)
-+{
-+	struct device *dev;
-+
-+	dev = acpi_obj_to_platform_device(obj);
-+	if (!dev)
-+		return NULL;
-+
-+	return dev_name(dev);
-+}
-+
 +/*
-+ * RSTL — Reset Lookup Table
++ * RSTL — Reset Lookup Table → _DSD property injection
 + *
 + * Each entry: { <provider_ref>, <index>, <consumer_ref>, [<con_id>] }
-+ * Registers a reset_control_lookup so devm_reset_control_get() can find
-+ * the reset line by consumer device name and optional connection ID.
++ *
++ * Since v7.1 the reset core routes devm_reset_control_get() for ACPI devices
++ * through __fwnode_reset_control_get(), which reads the _DSD-style
++ * "reset-names" and "resets" properties from the consumer's firmware node.
++ * CIX firmware supplies RSTL packages instead of those _DSD properties, so
++ * each RSTL entry is translated into native _DSD Device Properties
++ * (Package() { {name, value}, ... }) and injected into the consumer's
++ * acpi_device_data via acpi_data_add_props().  The "resets" value is a flat
++ * package of (ACPI_TYPE_LOCAL_REFERENCE, ACPI_TYPE_INTEGER) pairs: each
++ * reference points at the reset controller's ACPI handle and the integer is
++ * the reset index.  Provider devices get a "#reset-cells = 1" integer
++ * property.  reset-sky1.c is auto-provisioned by reset_controller_register()
++ * as a fwnode provider (fwnode_reset_simple_xlate, 1 cell), so no
++ * provider-driver change is needed.
++ *
++ * Because the properties live on the ACPI primary fwnode's _DSD data (not a
++ * secondary software node), they do not collide with IORT's secondary swnode
++ * (used for IOMMU props) — the two occupy different layers of the fwnode.
++ *
++ * Entries are collected during the namespace walk and injected afterwards by
++ * rst_inject_dsd_props().
 + */
++struct rst_ref {
++	struct list_head list;
++	acpi_handle provider_handle;
++	unsigned int index;
++	const char *con_id;		/* NULL for index-only resets */
++};
++
++struct rst_dev_entry {
++	struct list_head list;
++	struct acpi_device *adev;	/* provider and/or consumer */
++	bool is_provider;
++	struct list_head resets;	/* list of rst_ref (consumer side) */
++};
++
++static LIST_HEAD(rst_devices);
++
++/* Find or create the per-device collector entry (deduped by adev). */
++static struct rst_dev_entry *rst_dev_entry_get(struct acpi_device *adev)
++{
++	struct rst_dev_entry *entry;
++
++	list_for_each_entry(entry, &rst_devices, list)
++		if (entry->adev == adev)
++			return entry;
++
++	entry = kzalloc_obj(*entry, GFP_KERNEL);
++	if (!entry)
++		return NULL;
++	INIT_LIST_HEAD(&entry->resets);
++	entry->adev = adev;
++	list_add_tail(&entry->list, &rst_devices);
++	return entry;
++}
++
 +static int reset_lookup_handle(acpi_handle handle,
 +			       const union acpi_object *obj, void *data)
 +{
 +	struct device *dev = data;
 +	const union acpi_object *child, *el;
-+	struct reset_control_lookup *lookup;
++	struct acpi_device *padev, *cadev;
++	struct rst_dev_entry *centry, *pentry;
++	struct rst_ref *ref;
 +	int i, pcnt, count = 0;
 +	struct acpi_device *adev = acpi_fetch_acpi_dev(handle);
 +
@@ -175,30 +223,35 @@ index 000000000000..111111111111
 +		    (pcnt > 3 && el[3].type != ACPI_TYPE_STRING))
 +			continue;
 +
-+		lookup = devm_kzalloc(dev, sizeof(*lookup), GFP_KERNEL);
-+		if (!lookup)
-+			return -ENOMEM;
-+		INIT_LIST_HEAD(&lookup->list);
-+		lookup->provider = acpi_obj_to_devname(&el[0]);
-+		lookup->index = el[1].integer.value;
-+		lookup->dev_id = acpi_obj_to_devname(&el[2]);
-+		lookup->con_id = pcnt > 3 ?
-+			devm_kstrdup(dev, el[3].string.pointer, GFP_KERNEL)
-+			: NULL;
-+
-+		if (!lookup->provider || (!lookup->dev_id && !lookup->con_id))
++		padev = acpi_obj_to_adev(&el[0]);
++		cadev = acpi_obj_to_adev(&el[2]);
++		if (!padev || !cadev)
 +			continue;
 +
-+		reset_controller_add_lookup(lookup, 1);
++		pentry = rst_dev_entry_get(padev);
++		centry = rst_dev_entry_get(cadev);
++		if (pentry)
++			pentry->is_provider = true;
++		if (!pentry || !centry)
++			continue;
++
++		ref = kzalloc_obj(*ref, GFP_KERNEL);
++		if (!ref)
++			return -ENOMEM;
++		ref->provider_handle = padev->handle;
++		ref->index = el[1].integer.value;
++		ref->con_id = pcnt > 3 ?
++			devm_kstrdup(dev, el[3].string.pointer, GFP_KERNEL) : NULL;
++		list_add_tail(&ref->list, &centry->resets);
 +
 +		dev_dbg(&adev->dev,
-+			"rst lookup: prov[%s] idx[%llu] dev[%s] con[%s]\n",
-+			lookup->provider, el[1].integer.value,
-+			lookup->dev_id, lookup->con_id);
++			"rst entry: prov[%s] idx[%llu] dev[%s] con[%s]\n",
++			dev_name(&padev->dev), el[1].integer.value,
++			dev_name(&cadev->dev), ref->con_id ?: "<none>");
 +		count++;
 +	}
 +
-+	dev_dbg(&adev->dev, "reset lookup: %d/%d entries\n",
++	dev_dbg(&adev->dev, "reset entries collected: %d/%d\n",
 +		count, obj->package.count);
 +
 +	return count;
@@ -432,11 +485,210 @@ index 000000000000..111111111111
 +	return AE_OK;
 +}
 +
++/*
++ * rst_build_dsd_package - build a _DSD Device Properties package for @dent.
++ *
++ * Returns a devm-allocated top-level Package() of {name, value} sub-packages
++ * ("#reset-cells" for providers, "reset-names"+"resets" for consumers), or
++ * NULL if @dent has nothing to inject.  The "resets" value is a flat package
++ * of (ACPI_TYPE_LOCAL_REFERENCE, ACPI_TYPE_INTEGER) pairs; named resets come
++ * first and are aligned with "reset-names", index-only resets at the tail.
++ */
++static union acpi_object *
++rst_build_dsd_package(struct device *dev, struct rst_dev_entry *dent)
++{
++	struct rst_ref *ref;
++	int n = 0, n_named = 0, nsubs = 0, i = 0;
++	union acpi_object *top, *top_elems;
++
++	list_for_each_entry(ref, &dent->resets, list) {
++		n++;
++		if (ref->con_id)
++			n_named++;
++	}
++
++	if (dent->is_provider)
++		nsubs++;			/* #reset-cells */
++	if (n_named)
++		nsubs++;			/* reset-names */
++	if (n)
++		nsubs++;			/* resets */
++	if (!nsubs)
++		return NULL;
++
++	top_elems = devm_kcalloc(dev, nsubs, sizeof(*top_elems), GFP_KERNEL);
++	if (!top_elems)
++		return NULL;
++
++	if (dent->is_provider) {
++		union acpi_object *e = devm_kcalloc(dev, 2, sizeof(*e), GFP_KERNEL);
++
++		if (!e)
++			return NULL;
++		e[0].type = ACPI_TYPE_STRING;
++		e[0].string.pointer = (char *)"#reset-cells";
++		e[0].string.length = sizeof("#reset-cells") - 1;
++		e[1].type = ACPI_TYPE_INTEGER;
++		e[1].integer.value = 1;
++		top_elems[i].type = ACPI_TYPE_PACKAGE;
++		top_elems[i].package.count = 2;
++		top_elems[i].package.elements = e;
++		i++;
++	}
++
++	if (n_named) {
++		union acpi_object *names = devm_kcalloc(dev, n_named,
++							sizeof(*names), GFP_KERNEL);
++		union acpi_object *e;
++		int j = 0;
++
++		if (!names)
++			return NULL;
++		list_for_each_entry(ref, &dent->resets, list) {
++			if (!ref->con_id)
++				continue;
++			names[j].type = ACPI_TYPE_STRING;
++			names[j].string.pointer = (char *)ref->con_id;
++			names[j].string.length = strlen(ref->con_id);
++			j++;
++		}
++		e = devm_kcalloc(dev, 2, sizeof(*e), GFP_KERNEL);
++		if (!e)
++			return NULL;
++		e[0].type = ACPI_TYPE_STRING;
++		e[0].string.pointer = (char *)"reset-names";
++		e[0].string.length = sizeof("reset-names") - 1;
++		e[1].type = ACPI_TYPE_PACKAGE;
++		e[1].package.count = n_named;
++		e[1].package.elements = names;
++		top_elems[i].type = ACPI_TYPE_PACKAGE;
++		top_elems[i].package.count = 2;
++		top_elems[i].package.elements = e;
++		i++;
++	}
++
++	if (n) {
++		union acpi_object *rsets = devm_kcalloc(dev, 2 * n,
++							sizeof(*rsets), GFP_KERNEL);
++		union acpi_object *e;
++		int j = 0;
++
++		if (!rsets)
++			return NULL;
++		/* named resets first, aligned with reset-names[] */
++		list_for_each_entry(ref, &dent->resets, list) {
++			if (!ref->con_id)
++				continue;
++			rsets[j].type = ACPI_TYPE_LOCAL_REFERENCE;
++			rsets[j].reference.handle = ref->provider_handle;
++			j++;
++			rsets[j].type = ACPI_TYPE_INTEGER;
++			rsets[j].integer.value = ref->index;
++			j++;
++		}
++		/* index-only resets at the tail */
++		list_for_each_entry(ref, &dent->resets, list) {
++			if (ref->con_id)
++				continue;
++			rsets[j].type = ACPI_TYPE_LOCAL_REFERENCE;
++			rsets[j].reference.handle = ref->provider_handle;
++			j++;
++			rsets[j].type = ACPI_TYPE_INTEGER;
++			rsets[j].integer.value = ref->index;
++			j++;
++			dev_warn(dev, "rst: index-only reset on %s has no con_id\n",
++				 acpi_dev_name(dent->adev));
++		}
++		e = devm_kcalloc(dev, 2, sizeof(*e), GFP_KERNEL);
++		if (!e)
++			return NULL;
++		e[0].type = ACPI_TYPE_STRING;
++		e[0].string.pointer = (char *)"resets";
++		e[0].string.length = sizeof("resets") - 1;
++		e[1].type = ACPI_TYPE_PACKAGE;
++		e[1].package.count = 2 * n;
++		e[1].package.elements = rsets;
++		top_elems[i].type = ACPI_TYPE_PACKAGE;
++		top_elems[i].package.count = 2;
++		top_elems[i].package.elements = e;
++		i++;
++	}
++
++	top = devm_kmalloc(dev, sizeof(*top), GFP_KERNEL);
++	if (!top)
++		return NULL;
++	top->type = ACPI_TYPE_PACKAGE;
++	top->package.count = nsubs;
++	top->package.elements = top_elems;
++	return top;
++}
++
++/*
++ * rst_inject_dsd_props - inject the collected RSTL resets as _DSD properties.
++ *
++ * For each device that appeared in any RSTL entry, build a _DSD Device
++ * Properties package and add it to the device's acpi_device_data via
++ * acpi_data_add_props(), so __fwnode_reset_control_get() resolves the resets
++ * through the native ACPI fwnode ops (acpi_data_get_property /
++ * acpi_fwnode_get_reference_args).  acpi_data_get_property() requires
++ * adev->data.pointer to be non-NULL, so devices lacking a firmware _DSD get a
++ * small dummy buffer (never dereferenced — data.pointer is only a non-NULL
++ * guard and a kfree target — freed by the ACPI core on device removal).
++ */
++static void rst_inject_dsd_props(struct device *bridge_dev)
++{
++	/* ACPI _DSD Device Properties GUID: daffd814-6eba-4d8c-8a91-bc9bbf4aa301 */
++	static const guid_t dsd_guid =
++		GUID_INIT(0xdaffd814, 0x6eba, 0x4d8c,
++			  0x8a, 0x91, 0xbc, 0x9b, 0xbf, 0x4a, 0xa3, 0x01);
++	struct rst_dev_entry *dent, *dtmp;
++	struct rst_ref *ref, *rtmp;
++	int injected = 0;
++
++	list_for_each_entry_safe(dent, dtmp, &rst_devices, list) {
++		union acpi_object *pkg;
++		struct acpi_device_properties *props;
++
++		pkg = rst_build_dsd_package(bridge_dev, dent);
++		if (!pkg)
++			goto free_entry;
++
++		if (!dent->adev->data.pointer) {
++			union acpi_object *dummy = kzalloc_obj(*dummy, GFP_KERNEL);
++
++			if (!dummy)
++				goto free_entry;
++			dent->adev->data.pointer = dummy;
++		}
++
++		props = acpi_data_add_props(&dent->adev->data, &dsd_guid, pkg);
++		if (!props)
++			dev_warn(bridge_dev,
++				 "failed to inject reset _DSD props to %s\n",
++				 acpi_dev_name(dent->adev));
++		else
++			injected++;
++
++free_entry:
++		list_for_each_entry_safe(ref, rtmp, &dent->resets, list) {
++			list_del(&ref->list);
++			kfree(ref);
++		}
++		list_del(&dent->list);
++		kfree(dent);
++	}
++
++	dev_info(bridge_dev, "reset _DSD props injected on %d devices\n",
++		 injected);
++}
++
 +static int acpi_resource_lookup_probe(struct platform_device *pdev)
 +{
 +	acpi_walk_namespace(ACPI_TYPE_ANY, ACPI_ROOT_OBJECT,
 +			    ACPI_UINT32_MAX, acpi_bus_res_scan, NULL,
 +			    &pdev->dev, NULL);
++
++	rst_inject_dsd_props(&pdev->dev);
 +
 +	dev_info(&pdev->dev, "ACPI resource lookup complete\n");
 +	return 0;
