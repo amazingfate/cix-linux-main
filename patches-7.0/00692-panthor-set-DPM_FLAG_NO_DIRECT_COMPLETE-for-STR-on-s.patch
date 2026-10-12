@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
-Date: Thu, 21 May 2026 18:12:37 +0800
+Date: Mon, 12 Oct 2026 09:56:57 +0800
 Subject: panthor: set DPM_FLAG_NO_DIRECT_COMPLETE for STR on sky1
 
 ---
