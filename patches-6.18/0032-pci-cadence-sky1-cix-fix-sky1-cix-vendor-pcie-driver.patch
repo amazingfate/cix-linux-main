@@ -182,7 +182,7 @@ index 111111111111..222222222222 100644
  	return 0;
  }
  
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 52)
 +static void sky1_pcie_syscore_op_shutdown(void *data)
 +#else
  static void sky1_pcie_syscore_op_shutdown(void)
@@ -194,7 +194,7 @@ index 111111111111..222222222222 100644
  	}
  }
  
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 52)
 +static const struct syscore_ops sky1_pcie_syscore_ops = {
 +#else
  static struct syscore_ops sky1_pcie_syscore_ops = {
@@ -202,7 +202,7 @@ index 111111111111..222222222222 100644
  	.shutdown = sky1_pcie_syscore_op_shutdown,
  };
  
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 52)
 +static struct syscore sky1_pcie_syscore = {
 +	.ops = &sky1_pcie_syscore_ops,
 +};
@@ -224,7 +224,7 @@ index 111111111111..222222222222 100644
  	mutex_lock(&sky1_init_mutex);
  	/* Register for syscore ops only when first instance probed */
  	if (list_empty(&sky1_pcie_list))
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 52)
 +		register_syscore(&sky1_pcie_syscore);
 +#else
  		register_syscore_ops(&sky1_pcie_syscore_ops);
@@ -270,7 +270,7 @@ index 111111111111..222222222222 100644
  	if (pcie->is_probe) {
  		list_del(&pcie->list);
  		if (list_empty(&sky1_pcie_list))
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 52)
 +			unregister_syscore(&sky1_pcie_syscore);
 +#else
  			unregister_syscore_ops(&sky1_pcie_syscore_ops);
