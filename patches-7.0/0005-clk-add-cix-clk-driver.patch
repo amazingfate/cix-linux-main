@@ -9,10 +9,10 @@ Signed-off-by: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
  drivers/clk/Makefile                   |   1 +
  drivers/clk/cix/Kconfig                |  22 +
  drivers/clk/cix/Makefile               |   4 +
- drivers/clk/cix/clk-sky1-acpi.c        | 196 ++
+ drivers/clk/cix/clk-sky1-acpi.c        | 261 +++
  drivers/clk/cix/clk-sky1-audss.c       | 926 ++++++++++
  include/dt-bindings/clock/sky1-audss.h |  71 +
- 7 files changed, 1221 insertions(+)
+ 7 files changed, 1286 insertions(+)
 
 diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
 index 111111111111..222222222222 100644
@@ -81,7 +81,7 @@ new file mode 100644
 index 000000000000..111111111111
 --- /dev/null
 +++ b/drivers/clk/cix/clk-sky1-acpi.c
-@@ -0,0 +1,196 @@
+@@ -0,0 +1,261 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * CIX Sky1 ACPI clock lookup table (CLKT) driver
@@ -99,6 +99,14 @@ index 000000000000..111111111111
 + * looks up the corresponding SCMI clock (registered by clk-scmi
 + * as "scmi-clk-<id>"), and creates clkdev entries so consumer
 + * drivers find clocks via standard clk_get().
++ *
++ * Two SCMI clocks have no CLKT consumer but must stay enabled or the
++ * platform hangs (bisect on Orion O6):
++ *   - CLK_TREE_CPU_CLK_BC2 (core10_clk)
++ *   - CLK_TREE_PCIE_NI700_CLK (pcie_ni700_clk)
++ * They are pinned with clk_prepare_enable() (the
++ * rockchip_clk_protect_critical() pattern) so clk_disable_unused()
++ * leaves them alone.
 + */
 +
 +#include <linux/acpi.h>
@@ -106,15 +114,70 @@ index 000000000000..111111111111
 +#include <linux/clkdev.h>
 +#include <linux/module.h>
 +#include <linux/platform_device.h>
++#include <dt-bindings/clock/cix,sky1.h>
 +
 +struct sky1_acpi_clk {
 +	struct device *dev;
 +	int mapped;
 +};
 +
++/*
++ * Firmware-left-on clocks with no Linux consumer.  Gating them via SCMI
++ * hangs Sky1 (mailbox / fabric), so pin them enabled the way
++ * rockchip_clk_protect_critical() does.
++ */
++static const u16 sky1_critical_clks[] = {
++	CLK_TREE_CPU_CLK_BC2,		/* core10_clk */
++	CLK_TREE_PCIE_NI700_CLK,	/* pcie_ni700_clk */
++};
++
 +static void sky1_clkdev_drop(void *data)
 +{
 +	clkdev_drop(data);
++}
++
++static void sky1_acpi_clk_protect_critical(struct device *dev)
++{
++	unsigned int i, protected = 0;
++
++	for (i = 0; i < ARRAY_SIZE(sky1_critical_clks); i++) {
++		char scmi_id[20];
++		struct clk *clk;
++		unsigned int id = sky1_critical_clks[i];
++		int ret;
++
++		snprintf(scmi_id, sizeof(scmi_id), "scmi-clk-%u", id);
++		clk = clk_get(NULL, scmi_id);
++		if (IS_ERR(clk)) {
++			dev_warn(dev, "critical clock %s not found: %ld\n",
++				 scmi_id, PTR_ERR(clk));
++			continue;
++		}
++
++		ret = clk_prepare_enable(clk);
++		if (ret) {
++			dev_err(dev, "failed to prepare/enable %s: %d\n",
++				scmi_id, ret);
++			clk_put(clk);
++			continue;
++		}
++
++		/*
++		 * Drop the consumer handle only: clk_put() does not undo
++		 * clk_prepare_enable().  The core's prepare/enable counts
++		 * persist, so the clock stays on and clk_disable_unused()
++		 * skips it - the rockchip_clk_protect_critical() pattern.
++		 * These SCMI clocks have no Linux consumer; gating them
++		 * hangs Sky1 (mailbox / fabric).
++		 */
++		clk_put(clk);
++		protected++;
++		dev_info(dev, "protected critical clock scmi-clk-%u\n", id);
++	}
++
++	if (protected != ARRAY_SIZE(sky1_critical_clks))
++		dev_warn(dev, "only protected %u/%zu critical clocks\n",
++			 protected, ARRAY_SIZE(sky1_critical_clks));
 +}
 +
 +static int sky1_parse_clkt_entry(struct sky1_acpi_clk *priv,
@@ -255,6 +318,8 @@ index 000000000000..111111111111
 +	if (priv->mapped == 0)
 +		return dev_err_probe(&pdev->dev, -EPROBE_DEFER,
 +				     "No SCMI clocks mapped yet\n");
++
++	sky1_acpi_clk_protect_critical(&pdev->dev);
 +
 +	dev_info(&pdev->dev, "Mapped %d ACPI clock lookup entries\n",
 +		 priv->mapped);
