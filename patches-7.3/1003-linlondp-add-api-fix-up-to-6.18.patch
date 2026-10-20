@@ -2,22 +2,21 @@ From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
 Date: Tue, 20 Jan 2026 13:41:12 +0800
 Subject: linlondp: add api fix up to 6.18
-
 ---
- drivers/gpu/drm/cix/cix_virtual.c                     |  7 +++
- drivers/gpu/drm/cix/dptx/cix_edp_panel.c              | 15 +++++
- drivers/gpu/drm/cix/dptx/trilin_dptx.c                | 18 ++++++
- drivers/gpu/drm/cix/dptx/trilin_dptx_audio.c          |  5 ++
- drivers/gpu/drm/cix/dptx/trilin_dptx_cix.c            |  7 +++
- drivers/gpu/drm/cix/dptx/trilin_drm.c                 |  4 ++
- drivers/gpu/drm/cix/dptx/trilin_drm.h                 |  8 ++-
- drivers/gpu/drm/cix/dptx/trilin_drm_mst.c             | 29 ++++++++++
- drivers/gpu/drm/cix/linlon-dp/linlondp_crtc.c         |  8 +++
- drivers/gpu/drm/cix/linlon-dp/linlondp_drv.c          | 21 +++++++
- drivers/gpu/drm/cix/linlon-dp/linlondp_framebuffer.c  |  7 +++
- drivers/gpu/drm/cix/linlon-dp/linlondp_framebuffer.h  |  4 ++
- drivers/gpu/drm/cix/linlon-dp/linlondp_kms.c          |  4 ++
- drivers/gpu/drm/cix/linlon-dp/linlondp_wb_connector.c |  4 ++
+ drivers/gpu/drm/cix/cix_virtual.c             |  7 +++++
+ drivers/gpu/drm/cix/dptx/cix_edp_panel.c      | 15 ++++++++++
+ drivers/gpu/drm/cix/dptx/trilin_dptx.c        | 18 ++++++++++++
+ drivers/gpu/drm/cix/dptx/trilin_dptx_audio.c  |  5 ++++
+ drivers/gpu/drm/cix/dptx/trilin_dptx_cix.c    |  7 +++++
+ drivers/gpu/drm/cix/dptx/trilin_drm.c         |  4 +++
+ drivers/gpu/drm/cix/dptx/trilin_drm.h         |  8 ++++-
+ drivers/gpu/drm/cix/dptx/trilin_drm_mst.c     | 29 +++++++++++++++++++
+ drivers/gpu/drm/cix/linlon-dp/linlondp_crtc.c |  8 +++++
+ drivers/gpu/drm/cix/linlon-dp/linlondp_drv.c  | 21 ++++++++++++++
+ .../drm/cix/linlon-dp/linlondp_framebuffer.c  |  7 +++++
+ .../drm/cix/linlon-dp/linlondp_framebuffer.h  |  4 +++
+ drivers/gpu/drm/cix/linlon-dp/linlondp_kms.c  |  4 +++
+ .../drm/cix/linlon-dp/linlondp_wb_connector.c |  4 +++
  14 files changed, 140 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/cix/cix_virtual.c b/drivers/gpu/drm/cix/cix_virtual.c
@@ -110,7 +109,7 @@ diff --git a/drivers/gpu/drm/cix/dptx/trilin_dptx.c b/drivers/gpu/drm/cix/dptx/t
 index 111111111111..222222222222 100644
 --- a/drivers/gpu/drm/cix/dptx/trilin_dptx.c
 +++ b/drivers/gpu/drm/cix/dptx/trilin_dptx.c
-@@ -1974,8 +1974,12 @@ static int trilin_dp_ctrl_stream_off(struct trilin_dp *dp,
+@@ -1973,8 +1973,12 @@ static int trilin_dp_ctrl_stream_off(struct trilin_dp *dp,
  	u32 regs_off = TRILIN_DPTX_SOURCE_OFFSET * dp_panel->source_id;
  
  	if (dp->edp_panel) {
@@ -123,7 +122,7 @@ index 111111111111..222222222222 100644
  	}
  	/*reset infoframe*/
  	trilin_dp_write(dp, TRILIN_DPTX_SEC0_INFOFRAME_ENABLE + regs_off, 0);
-@@ -2205,7 +2209,12 @@ static int trilin_dp_core_on(struct trilin_dp *dp, bool shallow)
+@@ -2204,7 +2208,12 @@ static int trilin_dp_core_on(struct trilin_dp *dp, bool shallow)
  		dp->platform_id);
  
  	if (dp->edp_panel) {
@@ -136,7 +135,7 @@ index 111111111111..222222222222 100644
  		if (rc) {
  			DP_INFO("edp panel disable failed but GO ON");
  			rc = 0;
-@@ -2266,7 +2275,12 @@ static int trilin_dp_edp_panel_prepare(struct trilin_dp *dp)
+@@ -2265,7 +2274,12 @@ static int trilin_dp_edp_panel_prepare(struct trilin_dp *dp)
  	if (!dp->edp_panel || dp->edp_panel_ready)
  		return 0;
  
@@ -149,7 +148,7 @@ index 111111111111..222222222222 100644
  	if (rc) {
  		DP_ERR("edp panel prepare failed: %d\n", rc);
  		return rc;
-@@ -2281,8 +2295,12 @@ static void trilin_dp_edp_panel_unprepare(struct trilin_dp *dp)
+@@ -2280,8 +2294,12 @@ static void trilin_dp_edp_panel_unprepare(struct trilin_dp *dp)
  	if (!dp->edp_panel || !dp->edp_panel_ready)
  		return;
  
@@ -276,7 +275,7 @@ index 111111111111..222222222222 100644
 @@ -401,7 +404,11 @@ static int trilin_dp_mst_get_modes(struct drm_connector *connector)
  }
  
- enum drm_mode_status trilin_dp_mst_mode_valid(struct drm_connector *connector,
+ static enum drm_mode_status trilin_dp_mst_mode_valid(struct drm_connector *connector,
 +#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 15, 0)
  					      struct drm_display_mode *mode)
 +#else
@@ -346,7 +345,7 @@ diff --git a/drivers/gpu/drm/cix/linlon-dp/linlondp_crtc.c b/drivers/gpu/drm/cix
 index 111111111111..222222222222 100644
 --- a/drivers/gpu/drm/cix/linlon-dp/linlondp_crtc.c
 +++ b/drivers/gpu/drm/cix/linlon-dp/linlondp_crtc.c
-@@ -282,7 +282,11 @@ void linlondp_crtc_handle_event(struct linlondp_crtc *kcrtc,
+@@ -277,7 +277,11 @@ void linlondp_crtc_handle_event(struct linlondp_crtc *kcrtc,
  
  static void linlondp_wb_job_timer_callback(struct timer_list *t)
  {
@@ -358,7 +357,7 @@ index 111111111111..222222222222 100644
  	struct drm_writeback_job *job;
  	unsigned long flags;
  	struct linlondp_crtc *kcrtc;
-@@ -319,7 +323,11 @@ static void linlondp_set_wb_job_timer(struct linlondp_crtc *kcrtc)
+@@ -314,7 +318,11 @@ static void linlondp_set_wb_job_timer(struct linlondp_crtc *kcrtc)
  	struct linlondp_wb_connector *wb_conn = kcrtc->wb_conn;
  
  	if (wb_conn->timer_data.timer_started)
