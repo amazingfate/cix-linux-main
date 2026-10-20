@@ -2,133 +2,132 @@ From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
 Date: Sat, 30 May 2026 16:03:38 +0800
 Subject: add cix_dst driver
-
 ---
- drivers/soc/cix/Kconfig                                                     |    1 +
- drivers/soc/cix/Makefile                                                    |    1 +
- drivers/soc/cix/cix_dst/Kconfig                                             |  158 ++
- drivers/soc/cix/cix_dst/Makefile                                            |   30 +
- drivers/soc/cix/cix_dst/blackbox/Kconfig                                    |   46 +
- drivers/soc/cix/cix_dst/blackbox/Makefile                                   |   12 +
- drivers/soc/cix/cix_dst/blackbox/exception_trace/Makefile                   |    6 +
- drivers/soc/cix/cix_dst/blackbox/exception_trace/rdr_exception_trace.c      |  266 +++
- drivers/soc/cix/cix_dst/blackbox/exception_trace/rdr_exception_trace.h      |   34 +
- drivers/soc/cix/cix_dst/blackbox/exception_trace/rdr_exception_trace_ap.c   |  162 ++
- drivers/soc/cix/cix_dst/blackbox/platform_ap/Makefile                       |    6 +
- drivers/soc/cix/cix_dst/blackbox/platform_ap/include/rdr_ap_adapter.h       |   82 +
- drivers/soc/cix/cix_dst/blackbox/platform_ap/include/rdr_ap_hook.h          |  179 ++
- drivers/soc/cix/cix_dst/blackbox/platform_ap/include/rdr_ap_logbuf.h        |   19 +
- drivers/soc/cix/cix_dst/blackbox/platform_ap/include/rdr_ap_memid.h         |   19 +
- drivers/soc/cix/cix_dst/blackbox/platform_ap/include/rdr_ap_moddump.h       |   22 +
- drivers/soc/cix/cix_dst/blackbox/platform_ap/include/rdr_ap_regdump.h       |   30 +
- drivers/soc/cix/cix_dst/blackbox/platform_ap/include/rdr_ap_stack.h         |   36 +
- drivers/soc/cix/cix_dst/blackbox/platform_ap/include/rdr_ap_suspend.h       |   12 +
- drivers/soc/cix/cix_dst/blackbox/platform_ap/rdr_ap_adapter.c               |  481 +++++
- drivers/soc/cix/cix_dst/blackbox/platform_ap/rdr_ap_exception.c             |   98 +
- drivers/soc/cix/cix_dst/blackbox/platform_ap/rdr_ap_hook.c                  |  743 +++++++
- drivers/soc/cix/cix_dst/blackbox/platform_ap/rdr_ap_moddump.c               |  177 ++
- drivers/soc/cix/cix_dst/blackbox/platform_ap/rdr_ap_pstore.c                |  216 ++
- drivers/soc/cix/cix_dst/blackbox/platform_ap/rdr_ap_regdump.c               |  135 ++
- drivers/soc/cix/cix_dst/blackbox/platform_ap/rdr_ap_ringbuffer.c            |  202 ++
- drivers/soc/cix/cix_dst/blackbox/platform_ap/rdr_ap_stack.c                 |  275 +++
- drivers/soc/cix/cix_dst/blackbox/platform_ap/rdr_ap_suspend.c               |  285 +++
- drivers/soc/cix/cix_dst/blackbox/rdr_bootcheck.c                            |  348 ++++
- drivers/soc/cix/cix_dst/blackbox/rdr_cleartext.c                            |  600 ++++++
- drivers/soc/cix/cix_dst/blackbox/rdr_common.c                               |  653 ++++++
- drivers/soc/cix/cix_dst/blackbox/rdr_core.c                                 |  513 +++++
- drivers/soc/cix/cix_dst/blackbox/rdr_dump_core.c                            |  450 ++++
- drivers/soc/cix/cix_dst/blackbox/rdr_exception_core.c                       |  268 +++
- drivers/soc/cix/cix_dst/blackbox/rdr_exception_test.c                       |  110 +
- drivers/soc/cix/cix_dst/blackbox/rdr_field.h                                |   94 +
- drivers/soc/cix/cix_dst/blackbox/rdr_field_core.c                           |  362 ++++
- drivers/soc/cix/cix_dst/blackbox/rdr_inner.h                                |  268 +++
- drivers/soc/cix/cix_dst/blackbox/rdr_logmonitor_core.c                      |  495 +++++
- drivers/soc/cix/cix_dst/blackbox/rdr_module_core.c                          |  411 ++++
- drivers/soc/cix/cix_dst/blackbox/rdr_print.h                                |   37 +
- drivers/soc/cix/cix_dst/blackbox/rdr_reboot_reason.c                        |   93 +
- drivers/soc/cix/cix_dst/blackbox/rdr_safemem.c                              |  285 +++
- drivers/soc/cix/cix_dst/blackbox/rdr_utils.c                                |  103 +
- drivers/soc/cix/cix_dst/blackbox/rdr_utils.h                                |   13 +
- drivers/soc/cix/cix_dst/boot_postcode.c                                     |  361 ++++
- drivers/soc/cix/cix_dst/cache_exception_monitor/Kconfig                     |   16 +
- drivers/soc/cix/cix_dst/cache_exception_monitor/Makefile                    |    7 +
- drivers/soc/cix/cix_dst/cache_exception_monitor/cache_core_exception_drv.c  |  301 +++
- drivers/soc/cix/cix_dst/cache_exception_monitor/cache_dsu_exception_drv.c   |  138 ++
- drivers/soc/cix/cix_dst/cache_exception_monitor/cache_exception_interface.c |   76 +
- drivers/soc/cix/cix_dst/cache_exception_monitor/cache_exception_interface.h |   36 +
- drivers/soc/cix/cix_dst/cix_ap2se_ipc.c                                     |   18 +
- drivers/soc/cix/cix_dst/dsm/Kconfig                                         |   17 +
- drivers/soc/cix/cix_dst/dsm/Makefile                                        |    8 +
- drivers/soc/cix/cix_dst/dsm/dsm_core.c                                      |  870 ++++++++
- drivers/soc/cix/cix_dst/dsm/dsm_core.h                                      |   91 +
- drivers/soc/cix/cix_dst/dsm/dsm_errno.h                                     |   26 +
- drivers/soc/cix/cix_dst/dsm/dsm_plat.c                                      |  113 +
- drivers/soc/cix/cix_dst/dsm/dsm_test.c                                      |  270 +++
- drivers/soc/cix/cix_dst/dst_audio_timeout_error.c                           |   47 +
- drivers/soc/cix/cix_dst/dst_ddr_exception.c                                 |  958 +++++++++
- drivers/soc/cix/cix_dst/dst_fdleak_main.c                                   |  544 +++++
- drivers/soc/cix/cix_dst/dst_print.h                                         |   25 +
- drivers/soc/cix/cix_dst/dst_rcsu_gasket_error.c                             |  167 ++
- drivers/soc/cix/cix_dst/dst_reboot_reason.c                                 |  251 +++
- drivers/soc/cix/cix_dst/dst_sdei_exceptions.c                               |  150 ++
- drivers/soc/cix/cix_dst/dst_sdei_ni700_idm.c                                |  187 ++
- drivers/soc/cix/cix_dst/dst_sdei_tee_exceptions.c                           |  156 ++
- drivers/soc/cix/cix_dst/dst_sdei_tfa_trace.c                                |  109 +
- drivers/soc/cix/cix_dst/dst_sdei_tzc400.c                                   |  213 ++
- drivers/soc/cix/cix_dst/dst_wakeup_source.c                                 |   71 +
- drivers/soc/cix/cix_dst/hw_boottime.c                                       |  212 ++
- drivers/soc/cix/cix_dst/hw_breakpoint/Kconfig                               |   10 +
- drivers/soc/cix/cix_dst/hw_breakpoint/Makefile                              |    6 +
- drivers/soc/cix/cix_dst/hw_breakpoint/hw_breakpoint_plat.c                  | 1036 ++++++++++
- drivers/soc/cix/cix_dst/hw_breakpoint/hw_breakpoint_proc.c                  |  439 ++++
- drivers/soc/cix/cix_dst/hw_breakpoint/hw_breakpoint_trigger.c               |  299 +++
- drivers/soc/cix/cix_dst/hw_breakpoint/hw_breakpoint_until.c                 |  144 ++
- drivers/soc/cix/cix_dst/hw_breakpoint/hw_breakpoint_until.h                 |   33 +
- drivers/soc/cix/cix_dst/logger/Kconfig                                      |    7 +
- drivers/soc/cix/cix_dst/logger/Makefile                                     |    4 +
- drivers/soc/cix/cix_dst/logger/dst_logger.c                                 |  904 ++++++++
- drivers/soc/cix/cix_dst/memory_dump/Kconfig                                 |   14 +
- drivers/soc/cix/cix_dst/memory_dump/Makefile                                |    5 +
- drivers/soc/cix/cix_dst/memory_dump/kernel_dump.c                           |  323 +++
- drivers/soc/cix/cix_dst/memory_dump/kernel_dump.h                           |   67 +
- drivers/soc/cix/cix_dst/mntn_dump.c                                         |  269 +++
- drivers/soc/cix/cix_dst/pm_exception_monitor/Kconfig                        |   19 +
- drivers/soc/cix/cix_dst/pm_exception_monitor/Makefile                       |    9 +
- drivers/soc/cix/cix_dst/pm_exception_monitor/pm_exception_drv.c             |  109 +
- drivers/soc/cix/cix_dst/pm_exception_monitor/pm_exception_drv.h             |   65 +
- drivers/soc/cix/cix_dst/pm_exception_monitor/pm_exception_dsm.c             |  233 +++
- drivers/soc/cix/cix_dst/pm_exception_monitor/pm_exception_dsm.h             |   34 +
- drivers/soc/cix/cix_dst/pm_exception_monitor/pm_exception_ec_drv.c          |  158 ++
- drivers/soc/cix/cix_dst/pm_exception_monitor/pm_exception_protocol.c        |  195 ++
- drivers/soc/cix/cix_dst/printk_ext.c                                        |   50 +
- drivers/soc/cix/cix_dst/se_crash_monitor/Kconfig                            |    8 +
- drivers/soc/cix/cix_dst/se_crash_monitor/Makefile                           |    7 +
- drivers/soc/cix/cix_dst/se_crash_monitor/pm_wdt.c                           |   42 +
- drivers/soc/cix/cix_dst/se_crash_monitor/se_amu.c                           |   84 +
- drivers/soc/cix/cix_dst/se_crash_monitor/se_clk.c                           |   41 +
- drivers/soc/cix/cix_dst/se_crash_monitor/se_crash.h                         |   54 +
- drivers/soc/cix/cix_dst/se_crash_monitor/se_crash_drv.c                     |  315 +++
- drivers/soc/cix/cix_dst/se_crash_monitor/se_ddr.c                           |   67 +
- drivers/soc/cix/cix_dst/se_crash_monitor/se_power.c                         |   45 +
- drivers/soc/cix/cix_dst/se_crash_monitor/se_wdt.c                           |   91 +
- drivers/soc/cix/cix_dst/util.c                                              |  713 +++++++
- fs/pstore/platform.c                                                        |   11 +
- fs/pstore/ram.c                                                             |   36 +-
- include/linux/soc/cix/boot_postcode.h                                       |   16 +
- include/linux/soc/cix/cix_ap2se_ipc.h                                       |   40 +
- include/linux/soc/cix/dst_reboot_reason.h                                   |   18 +
- include/linux/soc/cix/mntn_dump_interface.h                                 |  101 +
- include/linux/soc/cix/mntn_public_interface.h                               |  202 ++
- include/linux/soc/cix/mntn_subtype_exception.h                              |  196 ++
- include/linux/soc/cix/plat_hw_breakpoint.h                                  |  133 ++
- include/linux/soc/cix/rdr_platform.h                                        |  106 +
- include/linux/soc/cix/rdr_platform_ap_hook.h                                |  168 ++
- include/linux/soc/cix/rdr_platform_ap_ringbuffer.h                          |   47 +
- include/linux/soc/cix/rdr_pub.h                                             |  486 +++++
- include/linux/soc/cix/rdr_types.h                                           |   22 +
- include/linux/soc/cix/util.h                                                |  111 +
- include/uapi/linux/perf_event.h                                             |   61 +
- 124 files changed, 21911 insertions(+), 16 deletions(-)
+ drivers/soc/cix/Kconfig                       |    1 +
+ drivers/soc/cix/Makefile                      |    1 +
+ drivers/soc/cix/cix_dst/Kconfig               |  158 +++
+ drivers/soc/cix/cix_dst/Makefile              |   30 +
+ drivers/soc/cix/cix_dst/blackbox/Kconfig      |   46 +
+ drivers/soc/cix/cix_dst/blackbox/Makefile     |   12 +
+ .../cix_dst/blackbox/exception_trace/Makefile |    6 +
+ .../exception_trace/rdr_exception_trace.c     |  266 +++++
+ .../exception_trace/rdr_exception_trace.h     |   34 +
+ .../exception_trace/rdr_exception_trace_ap.c  |  162 +++
+ .../cix/cix_dst/blackbox/platform_ap/Makefile |    6 +
+ .../platform_ap/include/rdr_ap_adapter.h      |   82 ++
+ .../platform_ap/include/rdr_ap_hook.h         |  179 +++
+ .../platform_ap/include/rdr_ap_logbuf.h       |   19 +
+ .../platform_ap/include/rdr_ap_memid.h        |   19 +
+ .../platform_ap/include/rdr_ap_moddump.h      |   22 +
+ .../platform_ap/include/rdr_ap_regdump.h      |   30 +
+ .../platform_ap/include/rdr_ap_stack.h        |   36 +
+ .../platform_ap/include/rdr_ap_suspend.h      |   12 +
+ .../blackbox/platform_ap/rdr_ap_adapter.c     |  481 ++++++++
+ .../blackbox/platform_ap/rdr_ap_exception.c   |   98 ++
+ .../blackbox/platform_ap/rdr_ap_hook.c        |  743 ++++++++++++
+ .../blackbox/platform_ap/rdr_ap_moddump.c     |  177 +++
+ .../blackbox/platform_ap/rdr_ap_pstore.c      |  216 ++++
+ .../blackbox/platform_ap/rdr_ap_regdump.c     |  135 +++
+ .../blackbox/platform_ap/rdr_ap_ringbuffer.c  |  203 ++++
+ .../blackbox/platform_ap/rdr_ap_stack.c       |  275 +++++
+ .../blackbox/platform_ap/rdr_ap_suspend.c     |  285 +++++
+ .../soc/cix/cix_dst/blackbox/rdr_bootcheck.c  |  348 ++++++
+ .../soc/cix/cix_dst/blackbox/rdr_cleartext.c  |  600 ++++++++++
+ drivers/soc/cix/cix_dst/blackbox/rdr_common.c |  653 +++++++++++
+ drivers/soc/cix/cix_dst/blackbox/rdr_core.c   |  513 ++++++++
+ .../soc/cix/cix_dst/blackbox/rdr_dump_core.c  |  450 +++++++
+ .../cix/cix_dst/blackbox/rdr_exception_core.c |  268 +++++
+ .../cix/cix_dst/blackbox/rdr_exception_test.c |  110 ++
+ drivers/soc/cix/cix_dst/blackbox/rdr_field.h  |   94 ++
+ .../soc/cix/cix_dst/blackbox/rdr_field_core.c |  362 ++++++
+ drivers/soc/cix/cix_dst/blackbox/rdr_inner.h  |  268 +++++
+ .../cix_dst/blackbox/rdr_logmonitor_core.c    |  495 ++++++++
+ .../cix/cix_dst/blackbox/rdr_module_core.c    |  411 +++++++
+ drivers/soc/cix/cix_dst/blackbox/rdr_print.h  |   37 +
+ .../cix/cix_dst/blackbox/rdr_reboot_reason.c  |   93 ++
+ .../soc/cix/cix_dst/blackbox/rdr_safemem.c    |  285 +++++
+ drivers/soc/cix/cix_dst/blackbox/rdr_utils.c  |  103 ++
+ drivers/soc/cix/cix_dst/blackbox/rdr_utils.h  |   13 +
+ drivers/soc/cix/cix_dst/boot_postcode.c       |  361 ++++++
+ .../cix_dst/cache_exception_monitor/Kconfig   |   16 +
+ .../cix_dst/cache_exception_monitor/Makefile  |    7 +
+ .../cache_core_exception_drv.c                |  301 +++++
+ .../cache_dsu_exception_drv.c                 |  138 +++
+ .../cache_exception_interface.c               |   76 ++
+ .../cache_exception_interface.h               |   36 +
+ drivers/soc/cix/cix_dst/cix_ap2se_ipc.c       |   18 +
+ drivers/soc/cix/cix_dst/dsm/Kconfig           |   17 +
+ drivers/soc/cix/cix_dst/dsm/Makefile          |    8 +
+ drivers/soc/cix/cix_dst/dsm/dsm_core.c        |  870 ++++++++++++++
+ drivers/soc/cix/cix_dst/dsm/dsm_core.h        |   91 ++
+ drivers/soc/cix/cix_dst/dsm/dsm_errno.h       |   26 +
+ drivers/soc/cix/cix_dst/dsm/dsm_plat.c        |  113 ++
+ drivers/soc/cix/cix_dst/dsm/dsm_test.c        |  270 +++++
+ .../soc/cix/cix_dst/dst_audio_timeout_error.c |   47 +
+ drivers/soc/cix/cix_dst/dst_ddr_exception.c   |  958 +++++++++++++++
+ drivers/soc/cix/cix_dst/dst_fdleak_main.c     |  544 +++++++++
+ drivers/soc/cix/cix_dst/dst_print.h           |   25 +
+ .../soc/cix/cix_dst/dst_rcsu_gasket_error.c   |  167 +++
+ drivers/soc/cix/cix_dst/dst_reboot_reason.c   |  251 ++++
+ drivers/soc/cix/cix_dst/dst_sdei_exceptions.c |  150 +++
+ drivers/soc/cix/cix_dst/dst_sdei_ni700_idm.c  |  187 +++
+ .../soc/cix/cix_dst/dst_sdei_tee_exceptions.c |  156 +++
+ drivers/soc/cix/cix_dst/dst_sdei_tfa_trace.c  |  109 ++
+ drivers/soc/cix/cix_dst/dst_sdei_tzc400.c     |  213 ++++
+ drivers/soc/cix/cix_dst/dst_wakeup_source.c   |   71 ++
+ drivers/soc/cix/cix_dst/hw_boottime.c         |  212 ++++
+ drivers/soc/cix/cix_dst/hw_breakpoint/Kconfig |   10 +
+ .../soc/cix/cix_dst/hw_breakpoint/Makefile    |    6 +
+ .../hw_breakpoint/hw_breakpoint_plat.c        | 1036 +++++++++++++++++
+ .../hw_breakpoint/hw_breakpoint_proc.c        |  439 +++++++
+ .../hw_breakpoint/hw_breakpoint_trigger.c     |  299 +++++
+ .../hw_breakpoint/hw_breakpoint_until.c       |  144 +++
+ .../hw_breakpoint/hw_breakpoint_until.h       |   33 +
+ drivers/soc/cix/cix_dst/logger/Kconfig        |    7 +
+ drivers/soc/cix/cix_dst/logger/Makefile       |    4 +
+ drivers/soc/cix/cix_dst/logger/dst_logger.c   |  904 ++++++++++++++
+ drivers/soc/cix/cix_dst/memory_dump/Kconfig   |   14 +
+ drivers/soc/cix/cix_dst/memory_dump/Makefile  |    5 +
+ .../soc/cix/cix_dst/memory_dump/kernel_dump.c |  323 +++++
+ .../soc/cix/cix_dst/memory_dump/kernel_dump.h |   67 ++
+ drivers/soc/cix/cix_dst/mntn_dump.c           |  269 +++++
+ .../cix/cix_dst/pm_exception_monitor/Kconfig  |   19 +
+ .../cix/cix_dst/pm_exception_monitor/Makefile |    9 +
+ .../pm_exception_monitor/pm_exception_drv.c   |  109 ++
+ .../pm_exception_monitor/pm_exception_drv.h   |   65 ++
+ .../pm_exception_monitor/pm_exception_dsm.c   |  233 ++++
+ .../pm_exception_monitor/pm_exception_dsm.h   |   34 +
+ .../pm_exception_ec_drv.c                     |  158 +++
+ .../pm_exception_protocol.c                   |  195 ++++
+ drivers/soc/cix/cix_dst/printk_ext.c          |   50 +
+ .../soc/cix/cix_dst/se_crash_monitor/Kconfig  |    8 +
+ .../soc/cix/cix_dst/se_crash_monitor/Makefile |    7 +
+ .../soc/cix/cix_dst/se_crash_monitor/pm_wdt.c |   42 +
+ .../soc/cix/cix_dst/se_crash_monitor/se_amu.c |   84 ++
+ .../soc/cix/cix_dst/se_crash_monitor/se_clk.c |   41 +
+ .../cix/cix_dst/se_crash_monitor/se_crash.h   |   54 +
+ .../cix_dst/se_crash_monitor/se_crash_drv.c   |  315 +++++
+ .../soc/cix/cix_dst/se_crash_monitor/se_ddr.c |   67 ++
+ .../cix/cix_dst/se_crash_monitor/se_power.c   |   45 +
+ .../soc/cix/cix_dst/se_crash_monitor/se_wdt.c |   91 ++
+ drivers/soc/cix/cix_dst/util.c                |  713 ++++++++++++
+ fs/pstore/platform.c                          |   11 +
+ fs/pstore/ram.c                               |   36 +-
+ include/linux/soc/cix/boot_postcode.h         |   16 +
+ include/linux/soc/cix/cix_ap2se_ipc.h         |   40 +
+ include/linux/soc/cix/dst_reboot_reason.h     |   18 +
+ include/linux/soc/cix/mntn_dump_interface.h   |  101 ++
+ include/linux/soc/cix/mntn_public_interface.h |  202 ++++
+ .../linux/soc/cix/mntn_subtype_exception.h    |  196 ++++
+ include/linux/soc/cix/plat_hw_breakpoint.h    |  133 +++
+ include/linux/soc/cix/rdr_platform.h          |  106 ++
+ include/linux/soc/cix/rdr_platform_ap_hook.h  |  168 +++
+ .../soc/cix/rdr_platform_ap_ringbuffer.h      |   47 +
+ include/linux/soc/cix/rdr_pub.h               |  486 ++++++++
+ include/linux/soc/cix/rdr_types.h             |   22 +
+ include/linux/soc/cix/util.h                  |  111 ++
+ include/uapi/linux/perf_event.h               |   61 +
+ 124 files changed, 21912 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/soc/cix/Kconfig b/drivers/soc/cix/Kconfig
 index 111111111111..222222222222 100644
@@ -2158,7 +2157,7 @@ index 000000000000..111111111111
 +	info.clock = local_clock();
 +	cpu = (u8)smp_processor_id();
 +	info.pid = (u32)task->pid;
-+	(void)strncpy(info.comm, task->comm, sizeof(task->comm) - 1);
++	(void)strscpy(info.comm, task->comm, sizeof(task->comm));
 +	info.comm[TASK_COMM_LEN - 1] = '\0';
 +	info.stack = (uintptr_t)task->stack;
 +
@@ -2241,7 +2240,7 @@ index 000000000000..111111111111
 +	info.clock = local_clock();
 +	info.timeout = (u32)timeout;
 +	info.pid = (u32)task->pid;
-+	(void)strncpy(info.comm, task->comm, sizeof(task->comm) - 1);
++	(void)strscpy(info.comm, task->comm, sizeof(task->comm));
 +	info.comm[TASK_COMM_LEN - 1] = '\0';
 +
 +	rdr_rbuf_write(g_hook_buffer[HK_HUNGTASK].percpu[0].vaddr, (u8 *)&info);
@@ -2848,8 +2847,8 @@ index 000000000000..111111111111
 +	mutex_lock(&g_modmem_mutex);
 +	if (g_moddump[modu].mem.size != 0) {
 +		g_moddump[modu].dump_funcptr = func;
-+		strncpy(g_moddump[modu].module_name, module_name,
-+			AMNTN_MODULE_NAME_LEN - 1);
++		strscpy(g_moddump[modu].module_name, module_name,
++			 AMNTN_MODULE_NAME_LEN);
 +		g_moddump[modu].module_name[AMNTN_MODULE_NAME_LEN - 1] = '\0';
 +		ret = 0;
 +	}
@@ -3165,7 +3164,7 @@ index 000000000000..111111111111
 +			goto ioinit_fail;
 +		}
 +
-+		strncpy(regs[i].name, res->name, REG_NAME_LEN - 1);
++		strscpy(regs[i].name, res->name, REG_NAME_LEN);
 +		regs[i].name[REG_NAME_LEN - 1] = '\0';
 +		regs[i].paddr = res->start;
 +		regs[i].size = resource_size(res);
@@ -3262,7 +3261,7 @@ new file mode 100755
 index 000000000000..111111111111
 --- /dev/null
 +++ b/drivers/soc/cix/cix_dst/blackbox/platform_ap/rdr_ap_ringbuffer.c
-@@ -0,0 +1,202 @@
+@@ -0,0 +1,203 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * rdr_hisi_ap_ringbuffer.c
@@ -3284,6 +3283,7 @@ index 000000000000..111111111111
 + */
 +
 +#include <linux/cacheflush.h>
++#include <linux/string.h>
 +#include <linux/slab.h>
 +#include <linux/soc/cix/rdr_platform_ap_ringbuffer.h>
 +#include "../rdr_print.h"
@@ -3313,7 +3313,7 @@ index 000000000000..111111111111
 +	memset(q->keys, 0, RDR_RB_KEYS_MAX + 1);
 +
 +	if (keys)
-+		strncpy(q->keys, keys, RDR_RB_KEYS_MAX);
++		strscpy(q->keys, keys, RDR_RB_KEYS_MAX + 1);
 +	dcache_clean_poc((u64)q, ((u64)q) + sizeof(*q));
 +	return 0;
 +}
@@ -3734,7 +3734,7 @@ index 000000000000..111111111111
 +		return;
 +
 +	stack = &head->stack[cpu];
-+	strncpy(stack->comm, task->comm, sizeof(task->comm) - 1);
++	strscpy(stack->comm, task->comm, sizeof(task->comm));
 +	stack->comm[TASK_COMM_LEN - 1] = '\0';
 +
 +	vm = task->stack_vm_area;
@@ -6263,9 +6263,9 @@ index 000000000000..111111111111
 +		return -1;
 +	}
 +
-+	strncpy(entry->level, input + level_offset, level_len);
++	strscpy(entry->level, input + level_offset, level_len);
 +	entry->level[level_len] = '\0';
-+	strncpy(time, input + time_offset, time_len);
++	strscpy(time, input + time_offset, time_len);
 +	time[time_len] = '\0';
 +	entry->log = (char *)input + log_offset;
 +
@@ -7946,7 +7946,7 @@ index 000000000000..111111111111
 +	if (dirs->err)
 +		return;
 +
-+	strncpy(dirs->dir[index].name, name, sizeof(dirs->dir[index].name));
++	strscpy(dirs->dir[index].name, name, sizeof(dirs->dir[index].name));
 +	dirs->dir[index].size = size;
 +	/*get date time*/
 +	date = dirs->dir[index].name;
@@ -10398,15 +10398,15 @@ index 000000000000..111111111111
 +			continue;
 +		if (dev->ic_name &&
 +		    strncmp(tmp->ic_name, dev->ic_name, DSM_MAX_IC_NAME_LEN)) {
-+			strncpy(tmp->ic_name, dev->ic_name,
-+				DSM_MAX_IC_NAME_LEN - 1);
++			strscpy(tmp->ic_name, dev->ic_name,
++			 DSM_MAX_IC_NAME_LEN);
 +			tmp->ic_name[DSM_MAX_IC_NAME_LEN - 1] = '\0';
 +		}
 +		if (dev->module_name &&
 +		    strncmp(tmp->module_name, dev->module_name,
 +			    DSM_MAX_MODULE_NAME_LEN)) {
-+			strncpy(tmp->module_name, dev->module_name,
-+				DSM_MAX_MODULE_NAME_LEN - 1);
++			strscpy(tmp->module_name, dev->module_name,
++			 DSM_MAX_MODULE_NAME_LEN);
 +			tmp->module_name[DSM_MAX_MODULE_NAME_LEN - 1] = '\0';
 +		}
 +		retval = 0;
@@ -10480,23 +10480,23 @@ index 000000000000..111111111111
 +		goto out;
 +	}
 +
-+	strncpy(ptr->client_name, dev->name, CLIENT_NAME_LEN - 1);
++	strscpy(ptr->client_name, dev->name, CLIENT_NAME_LEN);
 +	ptr->client_name[CLIENT_NAME_LEN - 1] = '\0';
 +
 +	if (dev->device_name) {
-+		strncpy(ptr->device_name, dev->device_name,
-+			DSM_MAX_DEVICE_NAME_LEN - 1);
++		strscpy(ptr->device_name, dev->device_name,
++			 DSM_MAX_DEVICE_NAME_LEN);
 +		ptr->device_name[DSM_MAX_DEVICE_NAME_LEN - 1] = '\0';
 +	}
 +
 +	if (dev->ic_name) {
-+		strncpy(ptr->ic_name, dev->ic_name, DSM_MAX_IC_NAME_LEN - 1);
++		strscpy(ptr->ic_name, dev->ic_name, DSM_MAX_IC_NAME_LEN);
 +		ptr->ic_name[DSM_MAX_IC_NAME_LEN - 1] = '\0';
 +	}
 +
 +	if (dev->module_name) {
-+		strncpy(ptr->module_name, dev->module_name,
-+			DSM_MAX_MODULE_NAME_LEN - 1);
++		strscpy(ptr->module_name, dev->module_name,
++			 DSM_MAX_MODULE_NAME_LEN);
 +		ptr->module_name[DSM_MAX_MODULE_NAME_LEN - 1] = '\0';
 +	}
 +
@@ -13039,8 +13039,8 @@ index 000000000000..111111111111
 +
 +	info->is_32bit = fdleak_table[info->wpid].is_32bit[idx_pid];
 +	info->probe_cnt = fdleak_table[info->wpid].probe_cnt;
-+	strncpy(info->wp_name, fdleak_table[info->wpid].name,
-+		sizeof(info->wp_name) - 1);
++	strscpy(info->wp_name, fdleak_table[info->wpid].name,
++			 sizeof(info->wp_name));
 +	info->wp_name[sizeof(info->wp_name) - 1] = '\0';
 +
 +	for (probe_id = 0; probe_id < info->probe_cnt; probe_id++) {
@@ -14762,7 +14762,7 @@ index 000000000000..111111111111
 +	hw_boottime[boot_log_count].time_us = sky1_get_time_us();
 +	memset(&hw_boottime[boot_log_count].event, 0,
 +	       sizeof(hw_boottime[boot_log_count].event));
-+	strncpy((char *)&hw_boottime[boot_log_count].event, str, strlen(str));
++	strscpy((char *)&hw_boottime[boot_log_count].event, str, BOOT_STR_SIZE);
 +
 +	boot_log_count++;
 +	mutex_unlock(&hw_boottime_lock);
@@ -18811,7 +18811,7 @@ index 000000000000..111111111111
 +			if (strlen(pmic_error_no_map[i].name) >= buff_len)
 +				return -1;
 +
-+			strncpy(str, pmic_error_no_map[i].name, buff_len - 1);
++			strscpy(str, pmic_error_no_map[i].name, buff_len);
 +			pr_debug("error_no:%d, err_str:%s\n", error_no, str);
 +			return 0;
 +		}
@@ -20947,12 +20947,12 @@ index 000000000000..111111111111
 +	 * reproducible build warnings.
 +	 */
 +	if (blddt && dtlen > 0) {
-+		strncpy(blddt, "Jan 01 2025", dtlen - 1);
++		strscpy(blddt, "Jan 01 2025", dtlen);
 +		blddt[dtlen - 1] = '\0';
 +	}
 +
 +	if (bldtm && tmlen > 0) {
-+		strncpy(bldtm, "00:00:00", tmlen - 1);
++		strscpy(bldtm, "00:00:00", tmlen);
 +		bldtm[tmlen - 1] = '\0';
 +	}
 +

@@ -2,15 +2,15 @@ From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
 Date: Thu, 11 Jun 2026 17:11:06 +0800
 Subject: pci: cadence: sky1-cix: fix sky1 cix vendor pcie driver
-
 ---
- drivers/pci/controller/cadence/pci-sky1-cix.c             |  88 +++++--
- drivers/pci/controller/cadence/pci-sky1-debugfs.c         |   6 +-
- drivers/pci/controller/cadence/pcie-cadence-host-common.c |   3 +-
- drivers/pci/controller/cadence/pcie-cadence-host-hpa.c    | 131 +++++++++-
- drivers/pci/controller/cadence/pcie-cadence.c             |  46 ++++
- drivers/pci/controller/cadence/pcie-cadence.h             |  48 ++++
- 6 files changed, 290 insertions(+), 32 deletions(-)
+ drivers/pci/controller/cadence/pci-sky1-cix.c |  88 ++++++++----
+ .../pci/controller/cadence/pci-sky1-debugfs.c |   8 +-
+ .../cadence/pcie-cadence-host-common.c        |   3 +-
+ .../cadence/pcie-cadence-host-hpa.c           | 131 +++++++++++++++++-
+ drivers/pci/controller/cadence/pcie-cadence.c |  46 ++++++
+ drivers/pci/controller/cadence/pcie-cadence.h |  48 +++++++
+ drivers/usb/cdns3/cdns3-plat.c                |   4 +-
+ 7 files changed, 294 insertions(+), 34 deletions(-)
 
 diff --git a/drivers/pci/controller/cadence/pci-sky1-cix.c b/drivers/pci/controller/cadence/pci-sky1-cix.c
 index 111111111111..222222222222 100644
@@ -326,7 +326,7 @@ index 111111111111..222222222222 100644
  	offset = cdns_pcie_find_capability(reg_base, PCI_CAP_ID_EXP);
  	dev_info(pcie->dev, "PCI_CAP_ID_EXP: 0x%x\n", offset);
  
-@@ -937,7 +937,7 @@ static void sky1_pcie_set_speed_retrain(struct sky1_pcie *pcie)
+@@ -937,13 +937,13 @@ static void sky1_pcie_set_speed_retrain(struct sky1_pcie *pcie)
  	u8 offset;
  	char *speed;
  
@@ -335,6 +335,13 @@ index 111111111111..222222222222 100644
  	offset = cdns_pcie_find_capability(reg_base, PCI_CAP_ID_EXP);
  	val = readl(reg_base + offset + PCI_EXP_LNKCTL);
  	val |= PCI_EXP_LNKCTL_RL;
+ 	writel(val, reg_base + offset + PCI_EXP_LNKCTL);
+ 
+-	for (retries = 0; retries < LINK_WAIT_MAX_RETRIES; retries++) {
++	for (retries = 0; retries < PCIE_LINK_WAIT_MAX_RETRIES; retries++) {
+ 		if (sky1_pcie_link_up(pcie->cdns_pcie)) {
+ 			msleep(20);
+ 			break;
 @@ -1116,7 +1116,7 @@ static ssize_t sky1_pcie_compliance_write(struct file *file,
  	ret = kstrtoint_from_user(user_buf, count, 0, &type);
  	if (!ret) {
@@ -348,7 +355,7 @@ diff --git a/drivers/pci/controller/cadence/pcie-cadence-host-common.c b/drivers
 index 111111111111..222222222222 100644
 --- a/drivers/pci/controller/cadence/pcie-cadence-host-common.c
 +++ b/drivers/pci/controller/cadence/pcie-cadence-host-common.c
-@@ -262,7 +262,6 @@ int cdns_pcie_host_map_dma_ranges(struct cdns_pcie_rc *rc,
+@@ -268,7 +268,6 @@ int cdns_pcie_host_map_dma_ranges(struct cdns_pcie_rc *rc,
  {
  	struct cdns_pcie *pcie = &rc->pcie;
  	struct device *dev = pcie->dev;
@@ -356,7 +363,7 @@ index 111111111111..222222222222 100644
  	struct pci_host_bridge *bridge;
  	struct resource_entry *entry;
  	u32 no_bar_nbits = 32;
-@@ -273,7 +272,7 @@ int cdns_pcie_host_map_dma_ranges(struct cdns_pcie_rc *rc,
+@@ -279,7 +278,7 @@ int cdns_pcie_host_map_dma_ranges(struct cdns_pcie_rc *rc,
  		return -ENOMEM;
  
  	if (list_empty(&bridge->dma_ranges)) {
@@ -369,7 +376,7 @@ diff --git a/drivers/pci/controller/cadence/pcie-cadence-host-hpa.c b/drivers/pc
 index 111111111111..222222222222 100644
 --- a/drivers/pci/controller/cadence/pcie-cadence-host-hpa.c
 +++ b/drivers/pci/controller/cadence/pcie-cadence-host-hpa.c
-@@ -226,15 +226,105 @@ static void cdns_pcie_hpa_create_region_for_cfg(struct cdns_pcie_rc *rc)
+@@ -228,15 +228,105 @@ static void cdns_pcie_hpa_create_region_for_cfg(struct cdns_pcie_rc *rc)
  			     CDNS_PCIE_HPA_AT_OB_REGION_CTRL0(0), 0x06000000);
  }
  
@@ -475,7 +482,7 @@ index 111111111111..222222222222 100644
  
  	entry = resource_list_first_type(&bridge->windows, IORESOURCE_BUS);
  	if (entry)
-@@ -267,7 +357,7 @@ static int cdns_pcie_hpa_host_init_address_translation(struct cdns_pcie_rc *rc)
+@@ -269,7 +359,7 @@ static int cdns_pcie_hpa_host_init_address_translation(struct cdns_pcie_rc *rc)
  		r++;
  	}
  
@@ -484,7 +491,7 @@ index 111111111111..222222222222 100644
  		return 0;
  	else
  		return cdns_pcie_host_map_dma_ranges(rc, cdns_pcie_hpa_host_bar_ib_config);
-@@ -326,6 +416,12 @@ int cdns_pcie_hpa_host_setup(struct cdns_pcie_rc *rc)
+@@ -344,6 +434,12 @@ int cdns_pcie_hpa_host_setup(struct cdns_pcie_rc *rc)
  	pcie = &rc->pcie;
  	pcie->is_rc = true;
  
@@ -497,7 +504,7 @@ index 111111111111..222222222222 100644
  	if (!pcie->reg_base) {
  		pcie->reg_base = devm_platform_ioremap_resource_byname(pdev, "reg");
  		if (IS_ERR(pcie->reg_base)) {
-@@ -364,5 +460,38 @@ int cdns_pcie_hpa_host_setup(struct cdns_pcie_rc *rc)
+@@ -391,5 +487,38 @@ int cdns_pcie_hpa_host_setup(struct cdns_pcie_rc *rc)
  }
  EXPORT_SYMBOL_GPL(cdns_pcie_hpa_host_setup);
  
@@ -597,9 +604,9 @@ diff --git a/drivers/pci/controller/cadence/pcie-cadence.h b/drivers/pci/control
 index 111111111111..222222222222 100644
 --- a/drivers/pci/controller/cadence/pcie-cadence.h
 +++ b/drivers/pci/controller/cadence/pcie-cadence.h
-@@ -14,6 +14,46 @@
- #include "pcie-cadence-lga-regs.h"
- #include "pcie-cadence-hpa-regs.h"
+@@ -17,6 +17,46 @@
+ #define CDNS_PCIE_LGA_LTSSM_STATUS_MASK	GENMASK(29, 24)
+ #define CDNS_PCIE_HPA_LTSSM_STATUS_MASK	GENMASK(27, 20)
  
 +/*
 + * Local Management Registers
@@ -644,7 +651,7 @@ index 111111111111..222222222222 100644
  enum cdns_pcie_rp_bar {
  	RP_BAR_UNDEFINED = -1,
  	RP_BAR0,
-@@ -441,6 +481,7 @@ static inline bool cdns_pcie_link_up(struct cdns_pcie *pcie)
+@@ -624,6 +664,7 @@ static inline bool cdns_pcie_link_up(struct cdns_pcie *pcie)
  int cdns_pcie_host_link_setup(struct cdns_pcie_rc *rc);
  int cdns_pcie_host_init(struct cdns_pcie_rc *rc);
  int cdns_pcie_host_setup(struct cdns_pcie_rc *rc);
@@ -652,7 +659,7 @@ index 111111111111..222222222222 100644
  void cdns_pcie_host_disable(struct cdns_pcie_rc *rc);
  void __iomem *cdns_pci_map_bus(struct pci_bus *bus, unsigned int devfn,
  			       int where);
-@@ -461,6 +502,11 @@ static inline int cdns_pcie_host_setup(struct cdns_pcie_rc *rc)
+@@ -645,6 +686,11 @@ static inline int cdns_pcie_host_setup(struct cdns_pcie_rc *rc)
  	return 0;
  }
  
@@ -664,7 +671,7 @@ index 111111111111..222222222222 100644
  static inline int cdns_pcie_hpa_host_setup(struct cdns_pcie_rc *rc)
  {
  	return 0;
-@@ -498,6 +544,8 @@ static inline int cdns_pcie_hpa_ep_setup(struct cdns_pcie_ep *ep)
+@@ -686,6 +732,8 @@ static inline int cdns_pcie_hpa_ep_setup(struct cdns_pcie_ep *ep)
  
  #endif
  
@@ -673,6 +680,23 @@ index 111111111111..222222222222 100644
  u8   cdns_pcie_find_capability(struct cdns_pcie *pcie, u8 cap);
  u16  cdns_pcie_find_ext_capability(struct cdns_pcie *pcie, u8 cap);
  bool cdns_pcie_linkup(struct cdns_pcie *pcie);
+diff --git a/drivers/usb/cdns3/cdns3-plat.c b/drivers/usb/cdns3/cdns3-plat.c
+index 111111111111..222222222222 100644
+--- a/drivers/usb/cdns3/cdns3-plat.c
++++ b/drivers/usb/cdns3/cdns3-plat.c
+@@ -292,8 +292,10 @@ static int cdns3_controller_resume(struct device *dev, pm_message_t msg)
+ 
+ 	cdns3_set_platform_suspend(cdns->dev, false, false);
+ 
+-	spin_lock_irqsave(&cdns->lock, flags);
++	/* cdns_resume() may sleep; do not invoke it under cdns->lock. */
+ 	cdns_resume(cdns);
++
++	spin_lock_irqsave(&cdns->lock, flags);
+ 	cdns->in_lpm = false;
+ 	spin_unlock_irqrestore(&cdns->lock, flags);
+ 	cdns_set_active(cdns, !PMSG_IS_AUTO(msg));
+-- 
+
 -- 
 Cixtech
-
