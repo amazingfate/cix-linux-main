@@ -2,82 +2,27 @@ From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
 Date: Tue, 31 Mar 2026 14:25:25 +0800
 Subject: usb: add usb cdns3 driver for cix soc
-
 ---
- drivers/usb/cdns3/Kconfig      |  47 +-
- drivers/usb/cdns3/Makefile     |  24 +-
- drivers/usb/cdns3/cdnsp-plat.c | 432 +++++
- drivers/usb/cdns3/cdnsp-sky1.c | 903 ++++++++++
- drivers/usb/cdns3/cdnsp-sky1.h | 123 ++
- 5 files changed, 1519 insertions(+), 10 deletions(-)
+ drivers/usb/cdns3/Kconfig      |  13 +
+ drivers/usb/cdns3/Makefile     |   1 +
+ drivers/usb/cdns3/host.c       |   1 +
+ drivers/usb/cdns3/cdnsp-plat.c | 443 ++++++++++++++++++++++++++++++++++
+ drivers/usb/cdns3/cdnsp-sky1.c | 903 +++++++++++++++++++++++++++++++++
+ drivers/usb/cdns3/cdnsp-sky1.h | 123 +++++
+ 6 files changed, 1483 insertions(+)
 
 diff --git a/drivers/usb/cdns3/Kconfig b/drivers/usb/cdns3/Kconfig
 index 111111111111..222222222222 100644
 --- a/drivers/usb/cdns3/Kconfig
 +++ b/drivers/usb/cdns3/Kconfig
-@@ -93,22 +93,34 @@ endif
+@@ -110,6 +110,19 @@ config USB_CDNS3_STARFIVE
+ 	  If you choose to build this driver as module it will
+ 	  be dynamically linked and module will be called cdns3-starfive.ko
  
- if USB_CDNS_SUPPORT
- 
-+config USB_CDNSP
-+	tristate "Cadence USBSSP DRD Platform Driver"
-+	help
-+	  Say Y here if your system has a Cadence USBSSP dual-role controller
-+	  on a platform bus (not PCI).
-+
-+	  This is required for SoCs with integrated CDNSP controllers.
-+
-+	  If you choose to build this driver as a module, the module will
-+	  be called cdnsp.ko.
-+
- config USB_CDNSP_PCI
--	tristate "Cadence CDNSP Dual-Role Controller"
--	depends on USB_CDNS_SUPPORT && USB_PCI && ACPI
-+	tristate "Cadence USBSSP DRD PCI Driver"
-+	depends on USB_PCI && ACPI
- 	help
--	  Say Y here if your system has a Cadence CDNSP dual-role controller.
--	  It supports: dual-role switch Host-only, and Peripheral-only.
-+	  Say Y here if your system has a Cadence CDNSP dual-role controller
-+	  on a PCI bus.
-+
-+	  If you choose to build this driver as a module, the module will
-+	  be called cdnsp-udc-pci.ko.
- 
--	  If you choose to build this driver is a dynamically linked
--	  module, the module will be called cdnsp.ko.
- endif
- 
--if USB_CDNSP_PCI
-+if USB_CDNSP || USB_CDNSP_PCI
- 
- config USB_CDNSP_GADGET
- 	bool "Cadence CDNSP device controller"
--	depends on USB_GADGET=y || USB_GADGET=USB_CDNSP_PCI
-+	depends on USB_GADGET=y || USB_GADGET=USB_CDNSP || USB_GADGET=USB_CDNSP_PCI
- 	help
- 	  Say Y here to enable device controller functionality of the
- 	  Cadence CDNSP-DEV driver.
-@@ -121,7 +133,7 @@ config USB_CDNSP_GADGET
- 
- config USB_CDNSP_HOST
- 	bool "Cadence CDNSP host controller"
--	depends on USB=y || USB=USB_CDNSP_PCI
-+	depends on USB=y || USB=USB_CDNSP || USB=USB_CDNSP_PCI
- 	select USB_CDNS_HOST
- 	help
- 	  Say Y here to enable host controller functionality of the
-@@ -131,3 +143,20 @@ config USB_CDNSP_HOST
- 	  standard XHCI driver.
- 
- endif
-+
-+if USB_CDNSP
-+
 +config USB_CDNSP_SKY1
 +	tristate "Cadence USBSSP support on CIX Sky1 SoC platforms"
 +	depends on ARCH_CIX || COMPILE_TEST
-+	default USB_CDNSP
++	default USB_CDNS3
 +	help
 +	  Say 'Y' or 'M' here if you are building for CIX Sky1 SoCs
 +	  platforms that contain Cadence USBSSP controller core.
@@ -87,54 +32,34 @@ index 111111111111..222222222222 100644
 +	  If you choose to build this driver as module it will
 +	  be dynamically linked and module will be called cdnsp-sky1.ko
 +
-+endif
+ endif # USB_CDNS3
+ 
+ endif # USB_CDNS_SUPPORT
 diff --git a/drivers/usb/cdns3/Makefile b/drivers/usb/cdns3/Makefile
 index 111111111111..222222222222 100644
 --- a/drivers/usb/cdns3/Makefile
 +++ b/drivers/usb/cdns3/Makefile
-@@ -26,13 +26,35 @@ obj-$(CONFIG_USB_CDNS3_TI)			+= cdns3-ti.o
+@@ -28,3 +28,4 @@ obj-$(CONFIG_USB_CDNSP_PCI)			+= cdnsp-pci.o
+ obj-$(CONFIG_USB_CDNS3_TI)			+= cdns3-ti.o
  obj-$(CONFIG_USB_CDNS3_IMX)			+= cdns3-imx.o
  obj-$(CONFIG_USB_CDNS3_STARFIVE)		+= cdns3-starfive.o
++obj-$(CONFIG_USB_CDNSP_SKY1)			+= cdnsp-sky1.o cdnsp-plat.o
+diff --git a/drivers/usb/cdns3/host.c b/drivers/usb/cdns3/host.c
+index 111111111111..222222222222 100644
+--- a/drivers/usb/cdns3/host.c
++++ b/drivers/usb/cdns3/host.c
+@@ -165,4 +165,5 @@ int cdns_host_init(struct cdns *cdns)
+ 	cdns->roles[USB_ROLE_HOST] = rdrv;
  
-+# CDNSP platform driver (for SoCs with integrated USBSSP)
-+cdnsp-y						:= cdnsp-plat.o
-+
-+ifdef CONFIG_USB_CDNSP
-+ifeq ($(CONFIG_USB),m)
-+obj-m						+= cdnsp.o
-+else
-+obj-$(CONFIG_USB_CDNSP)				+= cdnsp.o
-+endif
-+endif
-+
-+cdnsp-$(CONFIG_USB_CDNSP_GADGET)		+= cdnsp-ring.o cdnsp-gadget.o \
-+						   cdnsp-mem.o cdnsp-ep0.o
-+
-+ifneq ($(CONFIG_USB_CDNSP_GADGET),)
-+cdnsp-$(CONFIG_TRACING)				+= cdnsp-trace.o
-+endif
-+
-+# CDNSP Sky1 glue layer
-+obj-$(CONFIG_USB_CDNSP_SKY1)			+= cdnsp-sky1.o
-+
-+# CDNSP PCI driver
- cdnsp-udc-pci-y					:= cdnsp-pci.o
- 
- ifdef CONFIG_USB_CDNSP_PCI
- ifeq ($(CONFIG_USB),m)
- obj-m						+= cdnsp-udc-pci.o
- else
--obj-$(CONFIG_USB_CDNSP_PCI) 			+= cdnsp-udc-pci.o
-+obj-$(CONFIG_USB_CDNSP_PCI)			+= cdnsp-udc-pci.o
- endif
- endif
- 
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(cdns_host_init);
 diff --git a/drivers/usb/cdns3/cdnsp-plat.c b/drivers/usb/cdns3/cdnsp-plat.c
 new file mode 100644
 index 000000000000..111111111111
 --- /dev/null
 +++ b/drivers/usb/cdns3/cdnsp-plat.c
-@@ -0,0 +1,432 @@
+@@ -0,0 +1,443 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Cadence USBSSP DRD Driver - Platform Device Support
@@ -162,6 +87,7 @@ index 000000000000..111111111111
 +
 +#include "core.h"
 +#include "gadget-export.h"
++#include "host-export.h"
 +#include "drd.h"
 +
 +/*
@@ -366,6 +292,11 @@ index 000000000000..111111111111
 +	if (ret)
 +		goto err_cdns_init;
 +
++	cdns->host_init = cdns_host_init;
++	ret = cdns_core_init_role(cdns);
++	if (ret)
++		goto err_cdns_init_role;
++
 +	device_set_wakeup_capable(dev, true);
 +	pm_runtime_set_active(dev);
 +	pm_runtime_enable(dev);
@@ -385,6 +316,9 @@ index 000000000000..111111111111
 +
 +	return 0;
 +
++err_cdns_init_role:
++	if (cdns->role_sw)
++		usb_role_switch_unregister(cdns->role_sw);
 +err_cdns_init:
 +	set_phy_power_off(cdns);
 +err_phy_power_on:
@@ -478,8 +412,10 @@ index 000000000000..111111111111
 +
 +	cdnsp_set_platform_suspend(cdns->dev, false, false);
 +
-+	spin_lock_irqsave(&cdns->lock, flags);
++	/* cdns_resume() may sleep; do not invoke it under cdns->lock. */
 +	cdns_resume(cdns);
++
++	spin_lock_irqsave(&cdns->lock, flags);
 +	cdns->in_lpm = false;
 +	spin_unlock_irqrestore(&cdns->lock, flags);
 +	cdns_set_active(cdns, !PMSG_IS_AUTO(msg));

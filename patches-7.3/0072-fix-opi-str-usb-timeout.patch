@@ -1,7 +1,20 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: None <None>
-Date: Mon, 27 Jul 2026 14:49:12 +0800
-Subject: None
+From: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
+Date: Sat, 10 Oct 2026 15:00:00 +0800
+Subject: usb: cdns3: fix xhci timeout at resume from STR
+
+On resume from STR, cdnsp_controller_resume() ran the
+cdns_power_is_lost() check while the controller was still in platform
+suspend, because cdnsp_set_platform_suspend(dev, false, false) was
+only called later in the resume path.  The power-lost check could
+therefore read a wrong value, conclude that no power was lost, and
+skip the controller re-initialization - the xhci device then timed
+out on resume.
+
+Move cdnsp_set_platform_suspend(cdns->dev, false, false) to the very
+start of the resume path, before the power-lost check.
+
+Signed-off-by: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
 
 ---
  drivers/usb/cdns3/cdnsp-plat.c | 4 ++--
