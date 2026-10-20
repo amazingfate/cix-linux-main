@@ -2,9 +2,7 @@ From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
 Date: Fri, 10 Jul 2026 19:29:03 +0800
 Subject: drm/panthor: Sky1 (CIXH5000) ACPI bring-up
-
 Bring the driver up on the Sky1 SoC when probed via ACPI:
-
 - Sky1 detection via ACPI HID (panthor_is_sky1) and power-on through a
   raw SMC SCMI POWER_STATE_SET call to TFA, which also configures IDM
   non-secure access; without it GPU register access raises SError.
@@ -13,18 +11,18 @@ Bring the driver up on the Sky1 SoC when probed via ACPI:
   optional reset control, and the Sky1 power-on sequence (IP reset +
   Q-channel clock gating).
 - IRQ lookup by index under ACPI (vs byname under DT).
-
 Co-Authored-By: Claude <noreply@anthropic.com>
+
 ---
  drivers/gpu/drm/panthor/Makefile         |   3 +-
- drivers/gpu/drm/panthor/panthor_device.c | 113 +++++-
- drivers/gpu/drm/panthor/panthor_device.h |   9 +
+ drivers/gpu/drm/panthor/panthor_device.c | 113 +++++++++++---
+ drivers/gpu/drm/panthor/panthor_device.h |   9 ++
  drivers/gpu/drm/panthor/panthor_drv.c    |  14 +-
  drivers/gpu/drm/panthor/panthor_fw.c     |   5 +-
  drivers/gpu/drm/panthor/panthor_gpu.c    |   5 +-
  drivers/gpu/drm/panthor/panthor_mmu.c    |   5 +-
- drivers/gpu/drm/panthor/panthor_sky1.c   | 182 ++++++++++
- drivers/gpu/drm/panthor/panthor_sky1.h   |  40 ++
+ drivers/gpu/drm/panthor/panthor_sky1.c   | 182 +++++++++++++++++++++++
+ drivers/gpu/drm/panthor/panthor_sky1.h   |  40 +++++
  9 files changed, 351 insertions(+), 25 deletions(-)
 
 diff --git a/drivers/gpu/drm/panthor/Makefile b/drivers/gpu/drm/panthor/Makefile
@@ -45,15 +43,11 @@ diff --git a/drivers/gpu/drm/panthor/panthor_device.c b/drivers/gpu/drm/panthor/
 index 111111111111..222222222222 100644
 --- a/drivers/gpu/drm/panthor/panthor_device.c
 +++ b/drivers/gpu/drm/panthor/panthor_device.c
-@@ -26,6 +26,7 @@
+@@ -26,20 +26,38 @@
  #include "panthor_mmu.h"
  #include "panthor_pwr.h"
  #include "panthor_sched.h"
 +#include "panthor_sky1.h"
- 
- static int panthor_gpu_coherency_init(struct panthor_device *ptdev)
- {
-@@ -55,17 +56,34 @@ static int panthor_gpu_coherency_init(struct panthor_device *ptdev)
  
  static int panthor_clk_init(struct panthor_device *ptdev)
  {
@@ -99,7 +93,7 @@ index 111111111111..222222222222 100644
  
  	ptdev->clks.coregroup = devm_clk_get_optional(ptdev->base.dev, "coregroup");
  	if (IS_ERR(ptdev->clks.coregroup))
-@@ -245,7 +263,10 @@ int panthor_device_init(struct panthor_device *ptdev)
+@@ -223,7 +241,10 @@ int panthor_device_init(struct panthor_device *ptdev)
  	if (ret)
  		return ret;
  
@@ -111,7 +105,7 @@ index 111111111111..222222222222 100644
  	if (ret < 0) {
  		drm_err(&ptdev->base, "init power domains failed, ret=%d", ret);
  		return ret;
-@@ -255,10 +276,37 @@ int panthor_device_init(struct panthor_device *ptdev)
+@@ -233,10 +254,37 @@ int panthor_device_init(struct panthor_device *ptdev)
  	if (ret)
  		return ret;
  
@@ -153,7 +147,7 @@ index 111111111111..222222222222 100644
  
  	ptdev->phys_addr = res->start;
  
-@@ -274,9 +322,21 @@ int panthor_device_init(struct panthor_device *ptdev)
+@@ -252,9 +300,21 @@ int panthor_device_init(struct panthor_device *ptdev)
  	if (!IS_ENABLED(CONFIG_PM)) {
  		ret = panthor_device_resume(ptdev->base.dev);
  		if (ret)
@@ -176,7 +170,7 @@ index 111111111111..222222222222 100644
  	ret = panthor_hw_init(ptdev);
  	if (ret)
  		goto err_rpm_put;
-@@ -626,3 +686,22 @@ int panthor_device_suspend(struct device *dev)
+@@ -611,3 +671,22 @@ int panthor_device_suspend(struct device *dev)
  	atomic_set(&ptdev->pm.state, PANTHOR_DEVICE_PM_STATE_SUSPENDED);
  	return 0;
  }
@@ -211,7 +205,7 @@ index 111111111111..222222222222 100644
  #include <linux/atomic.h>
  #include <linux/io-pgtable.h>
  #include <linux/regulator/consumer.h>
-@@ -139,6 +140,12 @@ struct panthor_device {
+@@ -140,6 +141,12 @@ struct panthor_device {
  	/** @iomem: CPU mapping of the IOMEM region. */
  	void __iomem *iomem;
  
@@ -224,7 +218,7 @@ index 111111111111..222222222222 100644
  	/** @clks: GPU clocks. */
  	struct {
  		/** @core: Core clock. */
-@@ -303,6 +310,8 @@ struct panthor_file {
+@@ -376,6 +383,8 @@ struct panthor_file {
  
  int panthor_device_init(struct panthor_device *ptdev);
  void panthor_device_unplug(struct panthor_device *ptdev);
@@ -237,7 +231,7 @@ diff --git a/drivers/gpu/drm/panthor/panthor_drv.c b/drivers/gpu/drm/panthor/pan
 index 111111111111..222222222222 100644
 --- a/drivers/gpu/drm/panthor/panthor_drv.c
 +++ b/drivers/gpu/drm/panthor/panthor_drv.c
-@@ -1911,10 +1911,16 @@ static const struct acpi_device_id panthor_acpi_match[] = {
+@@ -1897,10 +1897,16 @@ static const struct acpi_device_id panthor_acpi_match[] = {
  MODULE_DEVICE_TABLE(acpi, panthor_acpi_match);
  #endif
  
@@ -262,7 +256,7 @@ diff --git a/drivers/gpu/drm/panthor/panthor_fw.c b/drivers/gpu/drm/panthor/pant
 index 111111111111..222222222222 100644
 --- a/drivers/gpu/drm/panthor/panthor_fw.c
 +++ b/drivers/gpu/drm/panthor/panthor_fw.c
-@@ -1459,7 +1459,10 @@ int panthor_fw_init(struct panthor_device *ptdev)
+@@ -1501,7 +1501,10 @@ int panthor_fw_init(struct panthor_device *ptdev)
  	INIT_LIST_HEAD(&fw->sections);
  	INIT_DELAYED_WORK(&fw->watchdog.ping_work, panthor_fw_ping_work);
  
@@ -278,7 +272,7 @@ diff --git a/drivers/gpu/drm/panthor/panthor_gpu.c b/drivers/gpu/drm/panthor/pan
 index 111111111111..222222222222 100644
 --- a/drivers/gpu/drm/panthor/panthor_gpu.c
 +++ b/drivers/gpu/drm/panthor/panthor_gpu.c
-@@ -158,7 +158,10 @@ int panthor_gpu_init(struct panthor_device *ptdev)
+@@ -165,7 +165,10 @@ int panthor_gpu_init(struct panthor_device *ptdev)
  	if (ret)
  		return ret;
  
@@ -294,8 +288,8 @@ diff --git a/drivers/gpu/drm/panthor/panthor_mmu.c b/drivers/gpu/drm/panthor/pan
 index 111111111111..222222222222 100644
 --- a/drivers/gpu/drm/panthor/panthor_mmu.c
 +++ b/drivers/gpu/drm/panthor/panthor_mmu.c
-@@ -2883,7 +2883,10 @@ int panthor_mmu_init(struct panthor_device *ptdev)
- 
+@@ -3410,7 +3410,10 @@ int panthor_mmu_init(struct panthor_device *ptdev)
+ 	mmu->iomem = ptdev->iomem + MMU_AS_BASE;
  	ptdev->mmu = mmu;
  
 -	irq = platform_get_irq_byname(to_platform_device(ptdev->base.dev), "mmu");
