@@ -2,7 +2,6 @@ From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Devin Li <Devin.Li@cixtech.com>
 Date: Thu, 4 Jun 2026 11:38:16 +0800
 Subject: ACPI: thermal: bind devfreq cooling devices via devfreq parent fwnode
-
 When a devfreq cooling device is registered through
 of_devfreq_cooling_register*(), cdev->devdata stores the private
 struct devfreq_cooling_device pointer rather than a struct acpi_device.
@@ -10,24 +9,22 @@ acpi_thermal_should_bind_cdev() blindly compared cdev->devdata against
 acpi_fetch_acpi_dev(handle), so the comparison always failed and the
 devfreq cooling device was never bound to any ACPI thermal trip point,
 even when DSDT _PSL/_ALx explicitly listed the underlying device.
-
 Resolve the real ACPI device by walking dfc->devfreq->dev.parent->fwnode
 when cdev->type starts with "devfreq". This brings the 7.0 ACPI thermal
 binding behavior in line with the 6.6 BSP, allowing GPU/devfreq cooling
 devices to bind to their thermal zones again.
-
 To enable this without breaking encapsulation through hardcoded offsets,
 struct devfreq_cooling_device is moved from drivers/thermal/devfreq_cooling.c
 to include/linux/devfreq_cooling.h so that ACPI thermal can access its
 fields safely.
-
 Signed-off-by: devin.li <Devin.Li@cixtech.com>
 Change-Id: I8b28e046bed57610279f6fc5244d1da21b7cd19f
+
 ---
- drivers/acpi/thermal.c            | 31 +++++++
- drivers/thermal/devfreq_cooling.c | 39 +-------
- include/linux/devfreq_cooling.h   | 44 ++++++++++
- 3 files changed, 79 insertions(+), 35 deletions(-)
+ drivers/acpi/thermal.c            | 33 ++++++++++++++++++++++-
+ drivers/thermal/devfreq_cooling.c | 39 +++------------------------
+ include/linux/devfreq_cooling.h   | 44 +++++++++++++++++++++++++++++++
+ 3 files changed, 80 insertions(+), 36 deletions(-)
 
 diff --git a/drivers/acpi/thermal.c b/drivers/acpi/thermal.c
 index 111111111111..222222222222 100644
@@ -85,6 +82,15 @@ index 111111111111..222222222222 100644
  	/* Skip critical and hot trips. */
  	if (!acpi_trip)
  		return false;
+@@ -949,7 +980,7 @@ static int acpi_thermal_probe(struct platform_device *pdev)
+ #ifdef CONFIG_CIX_THERMAL
+ 	result = acpi_thermal_get_sustainable_power(tz);
+ 	if (result)
+-		goto free_memory;
++		return result;
+ #endif
+ 
+ 	result = acpi_thermal_register_thermal_zone(tz, trip_table,
 diff --git a/drivers/thermal/devfreq_cooling.c b/drivers/thermal/devfreq_cooling.c
 index 111111111111..222222222222 100644
 --- a/drivers/thermal/devfreq_cooling.c
