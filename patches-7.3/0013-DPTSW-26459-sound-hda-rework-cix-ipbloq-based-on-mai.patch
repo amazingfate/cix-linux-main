@@ -2,25 +2,24 @@ From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
 Date: Wed, 1 Jul 2026 17:07:05 +0800
 Subject: DPTSW-26459: sound: hda: rework cix ipbloq based on mainline code
-
 Move the verb table init to alc269 codec driver so we can use the common
 codec suspend/resume framework.
-
 Signed-off-by: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
 Change-Id: I1dd603d5f86e1b1e3bc3b736b7877c9c21673c57
+
 ---
- sound/hda/codecs/realtek/alc269.c  | 144 ++++++
- sound/hda/controllers/cix-ipbloq.c | 228 +++++++++-
+ sound/hda/codecs/realtek/alc269.c  | 144 ++++++++++++++++++
+ sound/hda/controllers/cix-ipbloq.c | 228 ++++++++++++++++++++++++++++-
  2 files changed, 366 insertions(+), 6 deletions(-)
 
 diff --git a/sound/hda/codecs/realtek/alc269.c b/sound/hda/codecs/realtek/alc269.c
 index 111111111111..222222222222 100644
 --- a/sound/hda/codecs/realtek/alc269.c
 +++ b/sound/hda/codecs/realtek/alc269.c
-@@ -4155,6 +4155,12 @@ enum {
- 	ALC236_FIXUP_HP_DMIC,
- 	ALC256_FIXUP_HONOR_MRB_XXX_M1020_AUDIO,
- 	ALC245_FIXUP_HP_ENVY_X360_15_FH0XXX,
+@@ -4388,6 +4388,12 @@ enum {
+ 	ALC285_LENOVO_DAC_RENAME,
+ 	ALC287_FIXUP_YOGA9_SPEAKER2_TO_DAC1,
+ 	ALC256_FIXUP_IPASON_SMARTBOOK_S1,
 +	ALC256_FIXUP_CIX_SKY1_EVB,
 +	ALC256_FIXUP_CIX_SKY1_EVB_COEF,
 +	ALC256_FIXUP_CIX_SKY1_ORION_O6,
@@ -30,11 +29,10 @@ index 111111111111..222222222222 100644
  };
  
  /* A special fixup for Lenovo C940 and Yoga Duet 7;
-@@ -6727,6 +6733,141 @@ static const struct hda_fixup alc269_fixups[] = {
- 		.v.func = cs35l41_fixup_i2c_two,
- 		.chained = true,
- 		.chain_id = ALC245_FIXUP_HP_X360_MUTE_LEDS
-+	},
+@@ -7174,6 +7180,141 @@ static const struct hda_fixup alc269_fixups[] = {
+ 			{ }
+ 		},
+ 	},
 +	/* CIX Sky1 boards: model-name matched (cix,model), shared codec SSID. */
 +	[ALC256_FIXUP_CIX_SKY1_EVB] = {
 +		.type = HDA_FIXUP_PINS,
@@ -169,13 +167,14 @@ index 111111111111..222222222222 100644
 +			{ 0x03, AC_VERB_SET_CHANNEL_STREAMID, 0x10 },
 +			{ }
 +		}
- 	}
++	}
  };
  
-@@ -8073,6 +8214,9 @@ static const struct hda_model_fixup alc269_fixup_models[] = {
- 	{.id = ALC2XX_FIXUP_HEADSET_MIC, .name = "alc2xx-fixup-headset-mic"},
+ static const struct hda_quirk alc269_fixup_tbl[] = {
+@@ -8637,6 +8778,9 @@ static const struct hda_model_fixup alc269_fixup_models[] = {
  	{.id = ALC245_FIXUP_BASS_HP_DAC, .name = "alc245-fixup-bass-hp-dac"},
  	{.id = ALC256_FIXUP_HONOR_MRB_XXX_M1020_AUDIO, .name = "alc256-honor-mrb-xxx-m1020-audio"},
+ 	{.id = ALC287_FIXUP_LENOVO_LEGION_AW88399, .name = "alc287-lenovo-legion-aw88399"},
 +	{.id = ALC256_FIXUP_CIX_SKY1_EVB, .name = "CIX SKY1 EVB HDA"},
 +	{.id = ALC256_FIXUP_CIX_SKY1_ORION_O6, .name = "CIX SKY1 ORION O6 HDA"},
 +	{.id = ALC269_FIXUP_CIX_SKY1_ORAPI_6P, .name = "CIX SKY1 ORAPI 6P HDA"},
