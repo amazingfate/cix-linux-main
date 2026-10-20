@@ -2,19 +2,19 @@ From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
 Date: Wed, 18 Mar 2026 14:29:40 +0800
 Subject: irqchip: add cix sky1 pdc driver
-
 Signed-off-by: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
+
 ---
  drivers/irqchip/Kconfig        |   8 +
- drivers/irqchip/Makefile       |   3 +-
- drivers/irqchip/irq-sky1-pdc.c | 274 ++++++++++
- 3 files changed, 284 insertions(+), 1 deletion(-)
+ drivers/irqchip/Makefile       |   1 +
+ drivers/irqchip/irq-sky1-pdc.c | 274 +++++++++++++++++++++++++++++++++
+ 3 files changed, 283 insertions(+)
 
 diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
 index 111111111111..222222222222 100644
 --- a/drivers/irqchip/Kconfig
 +++ b/drivers/irqchip/Kconfig
-@@ -423,6 +423,14 @@ config IMX_GPCV2
+@@ -435,6 +435,14 @@ config IMX_GPCV2
  	help
  	  Enables the wakeup IRQs for IMX platforms with GPCv2 block
  
@@ -33,16 +33,14 @@ diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
 index 111111111111..222222222222 100644
 --- a/drivers/irqchip/Makefile
 +++ b/drivers/irqchip/Makefile
-@@ -86,7 +86,8 @@ obj-$(CONFIG_MVEBU_GICP)		+= irq-mvebu-gicp.o
- obj-$(CONFIG_MVEBU_ICU)			+= irq-mvebu-icu.o
+@@ -85,6 +85,7 @@ obj-$(CONFIG_MVEBU_ICU)			+= irq-mvebu-icu.o
  obj-$(CONFIG_MVEBU_ODMI)		+= irq-mvebu-odmi.o
  obj-$(CONFIG_MVEBU_PIC)			+= irq-mvebu-pic.o
--obj-$(CONFIG_MVEBU_SEI)			+= irq-mvebu-sei.o
-+obj-$(CONFIG_MVEBU_SEI)		+= irq-mvebu-sei.o
+ obj-$(CONFIG_MVEBU_SEI)			+= irq-mvebu-sei.o
 +obj-$(CONFIG_SKY1_PDC)			+= irq-sky1-pdc.o
  obj-$(CONFIG_LS_EXTIRQ)			+= irq-ls-extirq.o
  obj-$(CONFIG_LS_SCFG_MSI)		+= irq-ls-scfg-msi.o
- obj-$(CONFIG_ARCH_ASPEED)		+= irq-aspeed-vic.o irq-aspeed-i2c-ic.o irq-aspeed-scu-ic.o
+ obj-$(CONFIG_ASPEED_AST2700_INTC)	+= irq-ast2700.o irq-ast2700-intc0.o irq-ast2700-intc1.o
 diff --git a/drivers/irqchip/irq-sky1-pdc.c b/drivers/irqchip/irq-sky1-pdc.c
 new file mode 100644
 index 000000000000..111111111111
