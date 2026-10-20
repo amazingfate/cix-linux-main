@@ -2,10 +2,9 @@ From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Jianfeng Liu <liujianfeng1994@gmail.com>
 Date: Tue, 26 May 2026 19:24:05 +0800
 Subject: usb: cdns3: fix TypeC hotplug enumerati on failure
-
 ---
- drivers/usb/cdns3/cdnsp-sky1.c | 11 ++++++
- drivers/usb/cdns3/core.c       | 19 ++++++++++
+ drivers/usb/cdns3/cdnsp-sky1.c | 11 +++++++++++
+ drivers/usb/cdns3/core.c       | 19 +++++++++++++++++++
  drivers/usb/cdns3/core.h       |  1 +
  3 files changed, 31 insertions(+)
 
@@ -43,7 +42,7 @@ index 111111111111..222222222222 100644
 --- a/drivers/usb/cdns3/core.c
 +++ b/drivers/usb/cdns3/core.c
 @@ -74,6 +74,17 @@ static void cdns_exit_roles(struct cdns *cdns)
- 	cdns_drd_exit(cdns);
+ 		cdns_drd_exit(cdns);
  }
  
 +static int cdnsp_platform_reset(struct device *dev)
@@ -60,7 +59,7 @@ index 111111111111..222222222222 100644
  /**
   * cdns_core_init_role - initialize role of operation
   * @cdns: Pointer to cdns structure
-@@ -386,6 +397,14 @@ static int cdns_role_set(struct usb_role_switch *sw, enum usb_role role)
+@@ -376,6 +387,14 @@ static int cdns_role_set(struct usb_role_switch *sw, enum usb_role role)
  	}
  
  	cdns_role_stop(cdns);

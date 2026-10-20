@@ -9,8 +9,7 @@ Subject: pci: cadence: sky1-cix: fix sky1 cix vendor pcie driver
  .../cadence/pcie-cadence-host-hpa.c           | 131 +++++++++++++++++-
  drivers/pci/controller/cadence/pcie-cadence.c |  46 ++++++
  drivers/pci/controller/cadence/pcie-cadence.h |  48 +++++++
- drivers/usb/cdns3/cdns3-plat.c                |   4 +-
- 7 files changed, 294 insertions(+), 34 deletions(-)
+ 6 files changed, 291 insertions(+), 33 deletions(-)
 
 diff --git a/drivers/pci/controller/cadence/pci-sky1-cix.c b/drivers/pci/controller/cadence/pci-sky1-cix.c
 index 111111111111..222222222222 100644
@@ -680,23 +679,6 @@ index 111111111111..222222222222 100644
  u8   cdns_pcie_find_capability(struct cdns_pcie *pcie, u8 cap);
  u16  cdns_pcie_find_ext_capability(struct cdns_pcie *pcie, u8 cap);
  bool cdns_pcie_linkup(struct cdns_pcie *pcie);
-diff --git a/drivers/usb/cdns3/cdns3-plat.c b/drivers/usb/cdns3/cdns3-plat.c
-index 111111111111..222222222222 100644
---- a/drivers/usb/cdns3/cdns3-plat.c
-+++ b/drivers/usb/cdns3/cdns3-plat.c
-@@ -292,8 +292,10 @@ static int cdns3_controller_resume(struct device *dev, pm_message_t msg)
- 
- 	cdns3_set_platform_suspend(cdns->dev, false, false);
- 
--	spin_lock_irqsave(&cdns->lock, flags);
-+	/* cdns_resume() may sleep; do not invoke it under cdns->lock. */
- 	cdns_resume(cdns);
-+
-+	spin_lock_irqsave(&cdns->lock, flags);
- 	cdns->in_lpm = false;
- 	spin_unlock_irqrestore(&cdns->lock, flags);
- 	cdns_set_active(cdns, !PMSG_IS_AUTO(msg));
--- 
-
 -- 
 Cixtech
+
