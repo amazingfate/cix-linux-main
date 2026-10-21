@@ -5,7 +5,7 @@ Subject: firmware: arm_scmi: add acpi support to SCMI
 Signed-off-by: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
 
 ---
- drivers/firmware/arm_scmi/bus.c               | 24 ++---
+ drivers/firmware/arm_scmi/bus.c               | 31 ++---
  drivers/firmware/arm_scmi/common.h            | 11 ++-
  drivers/firmware/arm_scmi/driver.c            | 51 ++++++-----
  drivers/firmware/arm_scmi/shmem.c             | 88 ++++++++++++++++---
@@ -13,7 +13,7 @@ Signed-off-by: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
  drivers/firmware/arm_scmi/transports/optee.c  | 17 ++--
  drivers/firmware/arm_scmi/transports/smc.c    |  8 +-
  drivers/firmware/arm_scmi/transports/virtio.c |  4 +-
- 8 files changed, 165 insertions(+), 78 deletions(-)
+ 8 files changed, 172 insertions(+), 78 deletions(-)
 
 diff --git a/drivers/firmware/arm_scmi/bus.c b/drivers/firmware/arm_scmi/bus.c
 index 111111111111..222222222222 100644
@@ -52,16 +52,23 @@ index 111111111111..222222222222 100644
  		     int protocol, const char *name)
  {
  	int id, retval;
-@@ -495,7 +497,7 @@ __scmi_device_create(struct device_node *np, struct device *parent,
+@@ -495,7 +497,14 @@ __scmi_device_create(struct device_node *np, struct device *parent,
  
  	scmi_dev->id = id;
  	scmi_dev->dev.parent = parent;
 -	device_set_node(&scmi_dev->dev, of_fwnode_handle(of_node_get(np)));
++	/*
++	 * scmi_device_release() drops a reference to dev->of_node; take one
++	 * here for OF nodes.  ACPI fwnodes leave dev->of_node NULL and
++	 * of_node_put(NULL) is a no-op.
++	 */
++	if (is_of_node(np))
++		of_node_get(to_of_node(np));
 +	device_set_node(&scmi_dev->dev, np);
  	scmi_dev->dev.bus = &scmi_bus_type;
  	scmi_dev->dev.release = scmi_device_release;
  	dev_set_name(&scmi_dev->dev, "scmi_dev.%d", id);
-@@ -504,8 +506,8 @@ __scmi_device_create(struct device_node *np, struct device *parent,
+@@ -504,8 +513,8 @@ __scmi_device_create(struct device_node *np, struct device *parent,
  	if (retval)
  		goto put_dev;
  
@@ -72,7 +79,7 @@ index 111111111111..222222222222 100644
  
  	return scmi_dev;
  put_dev:
-@@ -521,15 +523,15 @@ __scmi_device_create(struct device_node *np, struct device *parent,
+@@ -521,15 +530,15 @@ __scmi_device_create(struct device_node *np, struct device *parent,
  }
  
  static struct scmi_device *
@@ -91,7 +98,7 @@ index 111111111111..222222222222 100644
  
  	return sdev;
  }
-@@ -557,7 +559,7 @@ _scmi_device_create(struct device_node *np, struct device *parent,
+@@ -557,7 +566,7 @@ _scmi_device_create(struct device_node *np, struct device *parent,
   *	   could have been potentially created for a whole protocol, unless no
   *	   device was found to have been requested for that specific protocol.
   */
