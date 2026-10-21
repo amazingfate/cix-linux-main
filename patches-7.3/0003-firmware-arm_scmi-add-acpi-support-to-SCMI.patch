@@ -9,11 +9,11 @@ Signed-off-by: Jianfeng Liu <Jianfeng.Liu@cixtech.com>
  drivers/firmware/arm_scmi/common.h            | 11 ++-
  drivers/firmware/arm_scmi/driver.c            | 51 ++++++-----
  drivers/firmware/arm_scmi/shmem.c             | 88 ++++++++++++++++---
- .../firmware/arm_scmi/transports/mailbox.c    | 40 +++++----
+ .../firmware/arm_scmi/transports/mailbox.c    | 48 +++++----
  drivers/firmware/arm_scmi/transports/optee.c  | 17 ++--
  drivers/firmware/arm_scmi/transports/smc.c    |  8 +-
  drivers/firmware/arm_scmi/transports/virtio.c |  4 +-
- 8 files changed, 172 insertions(+), 78 deletions(-)
+ 8 files changed, 180 insertions(+), 78 deletions(-)
 
 diff --git a/drivers/firmware/arm_scmi/bus.c b/drivers/firmware/arm_scmi/bus.c
 index 111111111111..222222222222 100644
@@ -514,7 +514,7 @@ index 111111111111..222222222222 100644
  #include <linux/slab.h>
  
  #include "../common.h"
-@@ -77,21 +79,22 @@ static void rx_callback(struct mbox_client *cl, void *m)
+@@ -77,21 +79,30 @@ static void rx_callback(struct mbox_client *cl, void *m)
  		      core->shmem->read_header(smbox->shmem), NULL);
  }
  
@@ -522,6 +522,7 @@ index 111111111111..222222222222 100644
 +static bool mailbox_chan_available(struct fwnode_handle *fwnode, int idx)
  {
  	int num_mb;
++	int ret;
 +	struct fwnode_reference_args fwnode_args;
  
  	/*
@@ -536,12 +537,19 @@ index 111111111111..222222222222 100644
  
 -	return !of_parse_phandle_with_args(of_node, "mboxes",
 -					   "#mbox-cells", idx, NULL);
-+	return !fwnode_property_get_reference_args(fwnode, "mboxes",
-+					   "#mbox-cells", 1, idx, &fwnode_args);
++	ret = fwnode_property_get_reference_args(fwnode, "mboxes",
++						 "#mbox-cells", 1, idx,
++						 &fwnode_args);
++	if (ret)
++		return false;
++
++	fwnode_handle_put(fwnode_args.fwnode);
++
++	return true;
  }
  
  /**
-@@ -116,10 +119,10 @@ static int mailbox_chan_validate(struct device *cdev, int *a2p_rx_chan,
+@@ -116,10 +127,10 @@ static int mailbox_chan_validate(struct device *cdev, int *a2p_rx_chan,
  				 int *p2a_chan, int *p2a_rx_chan)
  {
  	int num_mb, num_sh, ret = 0;
@@ -555,7 +563,7 @@ index 111111111111..222222222222 100644
  	dev_dbg(cdev, "Found %d mboxes and %d shmems !\n", num_mb, num_sh);
  
  	/* Bail out if mboxes and shmem descriptors are inconsistent */
-@@ -127,20 +130,20 @@ static int mailbox_chan_validate(struct device *cdev, int *a2p_rx_chan,
+@@ -127,20 +138,20 @@ static int mailbox_chan_validate(struct device *cdev, int *a2p_rx_chan,
  	    (num_mb == 1 && num_sh != 1) || (num_mb == 3 && num_sh != 2) ||
  	    (num_mb == 4 && num_sh != 2)) {
  		dev_warn(cdev,
@@ -583,7 +591,7 @@ index 111111111111..222222222222 100644
  			ret = -EINVAL;
  		}
  	}
-@@ -391,8 +394,15 @@ static const struct of_device_id scmi_of_match[] = {
+@@ -391,8 +402,15 @@ static const struct of_device_id scmi_of_match[] = {
  };
  MODULE_DEVICE_TABLE(of, scmi_of_match);
  
