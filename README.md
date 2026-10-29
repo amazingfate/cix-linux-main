@@ -69,3 +69,4 @@ There are following kernel parameters which are necessary for booting kernel:
 | kernel space driver | userspace driver |
 | --- | --- |
 | panthor | mesa since v25.1 supported by [upstream MR](https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34032) |
+
