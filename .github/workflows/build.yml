@@ -3,6 +3,9 @@ name: Build kernel
 # Build every patches-X.Y directory against its kernel base and upload the
 # resulting Debian packages as workflow artifacts.
 #
+# Runner: x86_64 (ubuntu-24.04) with the aarch64-linux-gnu cross toolchain.
+# The arm64 variant of this workflow builds natively on ubuntu-24.04-arm.
+#
 # The version list is discovered from the repository, not hardcoded: each
 # patches-X.Y is built against the linux-X.Y.y stable branch, or against
 # mainline when that branch does not exist (yet) - the vX.Y tag if released,
@@ -26,6 +29,7 @@ concurrency:
 
 env:
   ARCH: arm64
+  CROSS_COMPILE: aarch64-linux-gnu-
   STABLE_REPO: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git
   MAINLINE_REPO: https://github.com/torvalds/linux.git
 
@@ -104,11 +108,10 @@ jobs:
   build:
     name: Linux ${{ matrix.version }}
     needs: prepare
-    # Native arm64 runner, so no cross toolchain is needed and bindeb-pkg
-    # produces arm64 packages directly. Forks of public repos get these
-    # runners for free; on a private fork switch to ubuntu-24.04 and add
-    # CROSS_COMPILE=aarch64-linux-gnu- to every make invocation.
-    runs-on: ubuntu-24.04-arm
+    # x86_64 runner with the aarch64 cross toolchain. The arm64 variant of
+    # this workflow (branch workflow-build) runs on ubuntu-24.04-arm and
+    # builds natively; keep the two in sync apart from the toolchain setup.
+    runs-on: ubuntu-24.04
     timeout-minutes: 240
     strategy:
       fail-fast: false
@@ -131,7 +134,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential bc bison flex libelf-dev libssl-dev libncurses-dev \
             dwarves rsync kmod cpio xz-utils zstd debhelper dpkg-dev fakeroot \
-            lsb-release
+            lsb-release gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
 
       - name: Clone Linux ${{ matrix.kernel_ref }}
         run: |
